@@ -22,6 +22,10 @@ export type Database = {
           player1_score: number | null
           player2_id: string | null
           player2_score: number | null
+          player3_id: string | null
+          player3_score: number | null
+          player4_id: string | null
+          player4_score: number | null
           round: number
           status: Database["public"]["Enums"]["match_status"] | null
           tournament_id: string | null
@@ -34,6 +38,10 @@ export type Database = {
           player1_score?: number | null
           player2_id?: string | null
           player2_score?: number | null
+          player3_id?: string | null
+          player3_score?: number | null
+          player4_id?: string | null
+          player4_score?: number | null
           round: number
           status?: Database["public"]["Enums"]["match_status"] | null
           tournament_id?: string | null
@@ -46,6 +54,10 @@ export type Database = {
           player1_score?: number | null
           player2_id?: string | null
           player2_score?: number | null
+          player3_id?: string | null
+          player3_score?: number | null
+          player4_id?: string | null
+          player4_score?: number | null
           round?: number
           status?: Database["public"]["Enums"]["match_status"] | null
           tournament_id?: string | null
@@ -62,6 +74,20 @@ export type Database = {
           {
             foreignKeyName: "matches_player2_id_fkey"
             columns: ["player2_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_player3_id_fkey"
+            columns: ["player3_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_player4_id_fkey"
+            columns: ["player4_id"]
             isOneToOne: false
             referencedRelation: "participants"
             referencedColumns: ["id"]

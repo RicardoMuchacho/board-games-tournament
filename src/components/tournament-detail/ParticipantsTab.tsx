@@ -9,9 +9,10 @@ import { toast } from "sonner";
 interface ParticipantsTabProps {
   tournamentId: string;
   tournamentType: string;
+  maxParticipants?: number;
 }
 
-export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTabProps) => {
+export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants }: ParticipantsTabProps) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,6 +64,11 @@ export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTa
       return;
     }
 
+    if (maxParticipants && participants.length >= maxParticipants) {
+      toast.error(`Maximum number of participants (${maxParticipants}) reached`);
+      return;
+    }
+
     const { error } = await supabase.from("participants").insert([
       {
         tournament_id: tournamentId,
@@ -89,7 +95,12 @@ export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTa
   };
 
   const generateMatches = async () => {
-    if (participants.length < 2) {
+    if (tournamentType === "catan") {
+      if (participants.length < 3) {
+        toast.error("Catan needs at least 3 participants");
+        return;
+      }
+    } else if (participants.length < 2) {
       toast.error("Need at least 2 participants");
       return;
     }
@@ -102,7 +113,25 @@ export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTa
       const matches: any[] = [];
       const shuffled = [...participants].sort(() => Math.random() - 0.5);
 
-      if (tournamentType === "round_robin") {
+      if (tournamentType === "catan") {
+        // Catan: create matches with 3-4 players each
+        for (let i = 0; i < shuffled.length; i += 4) {
+          const matchPlayers = shuffled.slice(i, Math.min(i + 4, shuffled.length));
+          
+          // Only create match if we have at least 3 players
+          if (matchPlayers.length >= 3) {
+            matches.push({
+              tournament_id: tournamentId,
+              round: 1,
+              player1_id: matchPlayers[0]?.id,
+              player2_id: matchPlayers[1]?.id,
+              player3_id: matchPlayers[2]?.id,
+              player4_id: matchPlayers[3]?.id || null,
+              status: "pending",
+            });
+          }
+        }
+      } else if (tournamentType === "round_robin") {
         // Round robin: everyone plays everyone
         for (let i = 0; i < shuffled.length; i++) {
           for (let j = i + 1; j < shuffled.length; j++) {
@@ -174,7 +203,9 @@ export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTa
       </Card>
 
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">{participants.length} Participants</h3>
+        <h3 className="text-lg font-semibold">
+          {participants.length} {maxParticipants ? `/ ${maxParticipants}` : ""} Participants
+        </h3>
         <Button onClick={generateMatches} disabled={loading || participants.length < 2} className="gap-2">
           <Shuffle className="h-4 w-4" />
           Generate Matches

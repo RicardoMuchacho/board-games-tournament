@@ -70,7 +70,11 @@ const TournamentDetail = () => {
             <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
           <TabsContent value="participants" className="mt-6">
-            <ParticipantsTab tournamentId={id!} tournamentType={tournament.type} />
+            <ParticipantsTab 
+              tournamentId={id!} 
+              tournamentType={tournament.type} 
+              maxParticipants={tournament.number_of_participants}
+            />
           </TabsContent>
           <TabsContent value="matches" className="mt-6">
             {tournament.type === "catan" ? (
