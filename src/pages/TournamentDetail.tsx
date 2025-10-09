@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Layers } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ParticipantsTab } from "@/components/tournament-detail/ParticipantsTab";
 import { MatchesTab } from "@/components/tournament-detail/MatchesTab";
@@ -51,28 +51,16 @@ const TournamentDetail = () => {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">{tournament.name}</h1>
-              <p className="text-muted-foreground capitalize">
-                {tournament.type.replace("_", " ")} Tournament • {tournament.status}
-              </p>
-            </div>
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">{tournament.name}</h1>
+            <p className="text-muted-foreground capitalize">
+              {tournament.type.replace("_", " ")} Tournament • {tournament.status}
+            </p>
           </div>
-          {tournament.number_of_rounds && tournament.number_of_rounds > 1 && (
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/tournament/${id}/rounds`)}
-              className="gap-2"
-            >
-              <Layers className="h-4 w-4" />
-              View by Rounds
-            </Button>
-          )}
         </div>
 
         <Tabs defaultValue="participants" className="w-full">
