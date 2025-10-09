@@ -58,6 +58,16 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
     const score = scores[matchId];
     if (!score) return;
 
+    // Validate scores
+    if (score.p1 < 0 || score.p1 > 999) {
+      toast.error("Player 1 score must be between 0 and 999");
+      return;
+    }
+    if (score.p2 < 0 || score.p2 > 999) {
+      toast.error("Player 2 score must be between 0 and 999");
+      return;
+    }
+
     const { error } = await supabase
       .from("matches")
       .update({
@@ -131,6 +141,7 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
                         <Input
                           type="number"
                           min="0"
+                          max="999"
                           className="w-16 text-center"
                           placeholder={match.player1_score?.toString() || "0"}
                           value={scores[match.id]?.p1 ?? ""}
@@ -153,6 +164,7 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
                         <Input
                           type="number"
                           min="0"
+                          max="999"
                           className="w-16 text-center"
                           placeholder={match.player2_score?.toString() || "0"}
                           value={scores[match.id]?.p2 ?? ""}
