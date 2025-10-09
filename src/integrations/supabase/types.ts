@@ -110,6 +110,8 @@ export type Database = {
           created_by: string | null
           id: string
           name: string
+          number_of_participants: number | null
+          number_of_rounds: number | null
           status: string | null
           type: Database["public"]["Enums"]["tournament_type"]
           updated_at: string | null
@@ -119,6 +121,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           name: string
+          number_of_participants?: number | null
+          number_of_rounds?: number | null
           status?: string | null
           type: Database["public"]["Enums"]["tournament_type"]
           updated_at?: string | null
@@ -128,6 +132,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           name?: string
+          number_of_participants?: number | null
+          number_of_rounds?: number | null
           status?: string | null
           type?: Database["public"]["Enums"]["tournament_type"]
           updated_at?: string | null
