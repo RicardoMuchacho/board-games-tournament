@@ -30,21 +30,39 @@ export function AllParticipantsList() {
       if (!user) return;
 
       // Get all participants from tournaments created by this user
-      const { data: participants, error } = await supabase
+      // First get tournament IDs
+      const { data: tournaments } = await supabase
+        .from('tournaments')
+        .select('id')
+        .eq('created_by', user.id);
+      
+      if (!tournaments || tournaments.length === 0) {
+        setParticipants([]);
+        setLoading(false);
+        return;
+      }
+
+      const tournamentIds = tournaments.map(t => t.id);
+
+      const { data: participantsData, error: participantsError } = await supabase
         .from('participants')
-        .select(`
-          id,
-          name,
-          tournament_id,
-          tournaments!inner(id, created_by, type)
-        `)
-        .eq('tournaments.created_by', user.id);
+        .select('id, name, tournament_id')
+        .in('tournament_id', tournamentIds);
 
-      console.log('Participants query result:', { participants, error });
-      if (error) throw error;
+      console.log('Participants query result:', { participantsData, participantsError });
+      
+      if (participantsError) {
+        console.error('Error fetching participants:', participantsError);
+        return;
+      }
 
-      // Get all matches for these participants
-      const participantIds = participants?.map(p => p.id) || [];
+      if (!participantsData || participantsData.length === 0) {
+        setParticipants([]);
+        setLoading(false);
+        return;
+      }
+
+      const participantIds = participantsData.map(p => p.id);
       
       const { data: matches, error: matchesError } = await supabase
         .from('matches')
@@ -77,7 +95,7 @@ export function AllParticipantsList() {
         total_tournament_points: number;
       }>();
 
-      participants?.forEach((p: any) => {
+      participantsData.forEach((p: any) => {
         if (!participantMap.has(p.name)) {
           participantMap.set(p.name, {
             id: p.id,

@@ -321,7 +321,8 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
                         <CommandGroup heading="Existing Participants">
                           {existingNames
                             .filter(name => 
-                              name.toLowerCase().includes(newName.toLowerCase())
+                              name.toLowerCase().includes(newName.toLowerCase()) &&
+                              !participants.some(p => p.name === name)
                             )
                             .map((name) => (
                               <CommandItem
