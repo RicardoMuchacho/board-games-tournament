@@ -53,6 +53,16 @@ export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTa
     e.preventDefault();
     if (!newName.trim()) return;
 
+    if (newName.trim().length < 2) {
+      toast.error("Name must be at least 2 characters");
+      return;
+    }
+
+    if (newName.trim().length > 100) {
+      toast.error("Name must be less than 100 characters");
+      return;
+    }
+
     const { error } = await supabase.from("participants").insert([
       {
         tournament_id: tournamentId,
@@ -61,7 +71,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType }: ParticipantsTa
     ]);
 
     if (error) {
-      toast.error("Failed to add participant");
+      toast.error(error.message || "Failed to add participant");
       return;
     }
 

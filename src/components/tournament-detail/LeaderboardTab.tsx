@@ -32,10 +32,10 @@ export const LeaderboardTab = ({ tournamentId }: LeaderboardTabProps) => {
   }, [tournamentId]);
 
   const fetchStandings = async () => {
-    const { data, error } = await supabase
-      .from("tournament_standings")
-      .select("*")
-      .eq("tournament_id", tournamentId);
+    // @ts-ignore - RPC function type not yet updated in generated types
+    const { data, error } = await supabase.rpc("get_tournament_standings", {
+      tournament_id_input: tournamentId,
+    });
 
     if (error) {
       toast.error("Failed to load standings");

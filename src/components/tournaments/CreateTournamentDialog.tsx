@@ -7,6 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { z } from "zod";
+
+const tournamentSchema = z.object({
+  name: z.string().trim().min(3, "Name must be at least 3 characters").max(100, "Name must be less than 100 characters"),
+  type: z.enum(["swiss", "eliminatory", "round_robin"]),
+});
 
 interface CreateTournamentDialogProps {
   open: boolean;
@@ -23,11 +29,28 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
     setLoading(true);
 
     try {
+      // Validate input
+      const validation = tournamentSchema.safeParse({ name, type });
+      if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
+        setLoading(false);
+        return;
+      }
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in to create a tournament");
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.from("tournaments").insert([
         {
-          name,
-          type,
+          name: validation.data.name,
+          type: validation.data.type,
           status: "active",
+          created_by: user.id,
         },
       ]);
 
@@ -38,7 +61,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
       setName("");
       setType("swiss");
     } catch (error: any) {
-      toast.error("Failed to create tournament");
+      toast.error(error.message || "Failed to create tournament");
     } finally {
       setLoading(false);
     }
