@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface CatanMatchesTabProps {
@@ -23,6 +24,7 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
     } 
   }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchMatches();
@@ -141,6 +143,19 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
 
   const rounds = Object.keys(groupedMatches).map(r => parseInt(r)).sort((a, b) => a - b);
 
+  const currentRoundMatches = groupedMatches[selectedRound] || [];
+
+  const filteredMatches = currentRoundMatches.filter((match) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    const participants = matchParticipants[match.id] || [];
+    return participants.some(p => p.participant?.name?.toLowerCase().includes(query));
+  });
+
+  const getTableNumber = (match: any) => {
+    return currentRoundMatches.findIndex(m => m.id === match.id) + 1;
+  };
+
   const getTournamentPoints = (placement: number): number => {
     const points: { [key: number]: number } = {
       1: 6,
@@ -176,15 +191,26 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
             ))}
           </div>
 
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search players..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
           <div className="grid gap-4">
-            {groupedMatches[selectedRound]?.map((match) => {
+            {filteredMatches.map((match) => {
               const participants = matchParticipants[match.id] || [];
+              const tableNumber = getTableNumber(match);
               
               return (
                 <Card key={match.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Catan Match</CardTitle>
+                      <CardTitle className="text-base">Table {tableNumber}</CardTitle>
                       <Badge
                         variant={
                           match.status === "completed"
@@ -280,6 +306,14 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
               );
             })}
           </div>
+
+          {filteredMatches.length === 0 && searchQuery && (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center h-32">
+                <p className="text-muted-foreground">No players found matching "{searchQuery}"</p>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

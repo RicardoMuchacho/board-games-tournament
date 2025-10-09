@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface MatchesTabProps {
@@ -14,6 +15,7 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [scores, setScores] = useState<{ [key: string]: { p1: number; p2: number } }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchMatches();
@@ -100,6 +102,21 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
 
   const rounds = Object.keys(groupedMatches).map(r => parseInt(r)).sort((a, b) => a - b);
 
+  const currentRoundMatches = groupedMatches[selectedRound] || [];
+  
+  const filteredMatches = currentRoundMatches.filter((match) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      match.player1?.name?.toLowerCase().includes(query) ||
+      match.player2?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const getTableNumber = (match: any) => {
+    return currentRoundMatches.findIndex(m => m.id === match.id) + 1;
+  };
+
   return (
     <div className="space-y-6">
       {rounds.length === 0 ? (
@@ -125,81 +142,102 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
             ))}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {groupedMatches[selectedRound]?.map((match) => (
-              <Card key={match.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">Match</CardTitle>
-                    <Badge
-                      variant={
-                        match.status === "completed"
-                          ? "default"
-                          : match.status === "in_progress"
-                          ? "secondary"
-                          : "outline"
-                      }
-                    >
-                      {match.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-medium">{match.player1?.name || "TBD"}</p>
-                    </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="999"
-                      className="w-16 text-center"
-                      placeholder={match.player1_score?.toString() || "0"}
-                      value={scores[match.id]?.p1 ?? ""}
-                      onChange={(e) =>
-                        setScores((prev) => ({
-                          ...prev,
-                          [match.id]: {
-                            p1: parseInt(e.target.value) || 0,
-                            p2: prev[match.id]?.p2 || 0,
-                          },
-                        }))
-                      }
-                      disabled={match.status === "completed"}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-medium">{match.player2?.name || "TBD"}</p>
-                    </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="999"
-                      className="w-16 text-center"
-                      placeholder={match.player2_score?.toString() || "0"}
-                      value={scores[match.id]?.p2 ?? ""}
-                      onChange={(e) =>
-                        setScores((prev) => ({
-                          ...prev,
-                          [match.id]: {
-                            p1: prev[match.id]?.p1 || 0,
-                            p2: parseInt(e.target.value) || 0,
-                          },
-                        }))
-                      }
-                      disabled={match.status === "completed"}
-                    />
-                  </div>
-                  {match.status !== "completed" && scores[match.id] && (
-                    <Button onClick={() => updateScore(match.id)} className="w-full">
-                      Save Score
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search players..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredMatches.map((match) => {
+              const tableNumber = getTableNumber(match);
+              return (
+                <Card key={match.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Table {tableNumber}</CardTitle>
+                      <Badge
+                        variant={
+                          match.status === "completed"
+                            ? "default"
+                            : match.status === "in_progress"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {match.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <p className="font-medium">{match.player1?.name || "TBD"}</p>
+                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="999"
+                        className="w-16 text-center"
+                        placeholder={match.player1_score?.toString() || "0"}
+                        value={scores[match.id]?.p1 ?? ""}
+                        onChange={(e) =>
+                          setScores((prev) => ({
+                            ...prev,
+                            [match.id]: {
+                              p1: parseInt(e.target.value) || 0,
+                              p2: prev[match.id]?.p2 || 0,
+                            },
+                          }))
+                        }
+                        disabled={match.status === "completed"}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <p className="font-medium">{match.player2?.name || "TBD"}</p>
+                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="999"
+                        className="w-16 text-center"
+                        placeholder={match.player2_score?.toString() || "0"}
+                        value={scores[match.id]?.p2 ?? ""}
+                        onChange={(e) =>
+                          setScores((prev) => ({
+                            ...prev,
+                            [match.id]: {
+                              p1: prev[match.id]?.p1 || 0,
+                              p2: parseInt(e.target.value) || 0,
+                            },
+                          }))
+                        }
+                        disabled={match.status === "completed"}
+                      />
+                    </div>
+                    {match.status !== "completed" && scores[match.id] && (
+                      <Button onClick={() => updateScore(match.id)} className="w-full">
+                        Save Score
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {filteredMatches.length === 0 && searchQuery && (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center h-32">
+                <p className="text-muted-foreground">No players found matching "{searchQuery}"</p>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
