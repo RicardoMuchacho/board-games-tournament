@@ -6,6 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Shuffle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { 
   generateCatanPairings, 
   generateSwissPairings, 
@@ -23,11 +36,14 @@ interface ParticipantsTabProps {
 export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds }: ParticipantsTabProps) => {
   const navigate = useNavigate();
   const [participants, setParticipants] = useState<any[]>([]);
+  const [existingNames, setExistingNames] = useState<string[]>([]);
   const [newName, setNewName] = useState("");
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchParticipants();
+    fetchExistingNames();
 
     const channel = supabase
       .channel(`participants-${tournamentId}`)
@@ -57,6 +73,28 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
       return;
     }
     setParticipants(data || []);
+  };
+
+  const fetchExistingNames = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("participants")
+      .select(`
+        name,
+        tournaments!inner(created_by)
+      `)
+      .eq("tournaments.created_by", user.id);
+
+    if (error) {
+      console.error("Failed to fetch existing names:", error);
+      return;
+    }
+
+    // Get unique names
+    const uniqueNames = [...new Set(data?.map((p: any) => p.name) || [])];
+    setExistingNames(uniqueNames.sort());
   };
 
   const addParticipant = async (e: React.FormEvent) => {
@@ -91,7 +129,9 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
     }
 
     setNewName("");
+    setOpen(false);
     toast.success("Participant added");
+    fetchExistingNames(); // Refresh the list of existing names
   };
 
   const deleteParticipant = async (id: string) => {
@@ -255,17 +295,68 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <form onSubmit={addParticipant} className="flex gap-2">
-            <Input
-              placeholder="Participant name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <Button type="submit" className="gap-2">
+          <div className="flex gap-2">
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="flex-1 justify-start"
+                >
+                  {newName || "Select existing or type new name..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search or type new name..." 
+                    value={newName}
+                    onValueChange={setNewName}
+                  />
+                  <CommandList>
+                    {existingNames.length > 0 && (
+                      <>
+                        <CommandEmpty>Type to create new participant</CommandEmpty>
+                        <CommandGroup heading="Existing Participants">
+                          {existingNames
+                            .filter(name => 
+                              name.toLowerCase().includes(newName.toLowerCase())
+                            )
+                            .map((name) => (
+                              <CommandItem
+                                key={name}
+                                value={name}
+                                onSelect={() => {
+                                  setNewName(name);
+                                  setOpen(false);
+                                }}
+                              >
+                                {name}
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </>
+                    )}
+                    {existingNames.length === 0 && (
+                      <CommandEmpty>Type name and click Add</CommandEmpty>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Button 
+              onClick={(e) => {
+                e.preventDefault();
+                addParticipant(e as any);
+              }} 
+              className="gap-2"
+              disabled={!newName.trim()}
+            >
               <Plus className="h-4 w-4" />
               Add
             </Button>
-          </form>
+          </div>
         </CardContent>
       </Card>
 
