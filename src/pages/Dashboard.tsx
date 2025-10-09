@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Trophy } from "lucide-react";
 import { TournamentList } from "@/components/tournaments/TournamentList";
 import { CreateTournamentDialog } from "@/components/tournaments/CreateTournamentDialog";
+import { AllParticipantsList } from "@/components/dashboard/AllParticipantsList";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -67,7 +68,10 @@ const Dashboard = () => {
           </div>
         </header>
 
-        <TournamentList />
+        <div className="space-y-6">
+          <AllParticipantsList />
+          <TournamentList />
+        </div>
       </div>
 
       <CreateTournamentDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
