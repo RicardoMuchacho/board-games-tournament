@@ -125,9 +125,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
             
             // Only create match if we have at least 3 players
             if (matchPlayers.length >= 3) {
-              const matchId = crypto.randomUUID();
               matches.push({
-                id: matchId,
                 tournament_id: tournamentId,
                 round: round,
                 player1_id: matchPlayers[0]?.id,
@@ -136,19 +134,51 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
                 player4_id: matchPlayers[3]?.id || null,
                 status: "pending",
               });
+            }
+          }
+        }
 
-              // Create match_participants entries for each player
-              matchPlayers.forEach((player) => {
+        // Insert matches first
+        const { data: insertedMatches, error: matchError } = await supabase
+          .from("matches")
+          .insert(matches)
+          .select();
+        
+        if (matchError) throw matchError;
+
+        // Now create match_participants for each inserted match
+        if (insertedMatches) {
+          for (let round = 1; round <= rounds; round++) {
+            const roundMatches = insertedMatches.filter(m => m.round === round);
+            const shuffled = [...participants].sort(() => Math.random() - 0.5);
+            
+            let playerIndex = 0;
+            for (const match of roundMatches) {
+              const matchPlayers = shuffled.slice(playerIndex, Math.min(playerIndex + 4, shuffled.length));
+              playerIndex += 4;
+
+              for (const player of matchPlayers) {
                 matchParticipants.push({
-                  match_id: matchId,
+                  match_id: match.id,
                   participant_id: player.id,
                   victory_points: 0,
                   tournament_points: 0,
                 });
-              });
+              }
             }
           }
+
+          // Insert match_participants
+          if (matchParticipants.length > 0) {
+            // @ts-ignore - match_participants table type not yet in generated types
+            const { error: mpError } = await (supabase as any)
+              .from("match_participants")
+              .insert(matchParticipants);
+            if (mpError) throw mpError;
+          }
         }
+
+        toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       } else if (tournamentType === "round_robin") {
         // Round robin: everyone plays everyone
         for (let i = 0; i < participants.length; i++) {
@@ -162,6 +192,11 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
             });
           }
         }
+
+        const { error } = await supabase.from("matches").insert(matches);
+        if (error) throw error;
+
+        toast.success(`Generated ${matches.length} matches`);
       } else if (tournamentType === "eliminatory") {
         // Single elimination bracket
         const shuffled = [...participants].sort(() => Math.random() - 0.5);
@@ -176,6 +211,11 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
             });
           }
         }
+
+        const { error } = await supabase.from("matches").insert(matches);
+        if (error) throw error;
+
+        toast.success(`Generated ${matches.length} matches`);
       } else {
         // Swiss: pair players for each round
         for (let round = 1; round <= rounds; round++) {
@@ -192,22 +232,14 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
             }
           }
         }
+
+        const { error } = await supabase.from("matches").insert(matches);
+        if (error) throw error;
+
+        toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       }
-
-      const { error } = await supabase.from("matches").insert(matches);
-      if (error) throw error;
-
-      // Insert match_participants for Catan
-      if (tournamentType === "catan" && matchParticipants.length > 0) {
-        // @ts-ignore - match_participants table type not yet in generated types
-        const { error: mpError } = await (supabase as any)
-          .from("match_participants")
-          .insert(matchParticipants);
-        if (mpError) throw mpError;
-      }
-
-      toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
     } catch (error) {
+      console.error("Match generation error:", error);
       toast.error("Failed to generate matches");
     } finally {
       setLoading(false);
