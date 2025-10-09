@@ -74,6 +74,7 @@ const TournamentDetail = () => {
               tournamentId={id!} 
               tournamentType={tournament.type} 
               maxParticipants={tournament.number_of_participants}
+              numberOfRounds={tournament.number_of_rounds}
             />
           </TabsContent>
           <TabsContent value="matches" className="mt-6">

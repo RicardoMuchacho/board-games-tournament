@@ -16,8 +16,8 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
   useEffect(() => {
     fetchStandings();
 
-    const channel = supabase
-      .channel(`standings-${tournamentId}`)
+    const matchesChannel = supabase
+      .channel(`standings-matches-${tournamentId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
@@ -27,22 +27,47 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
       )
       .subscribe();
 
+    const mpChannel = supabase
+      .channel(`standings-mp-${tournamentId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "match_participants" },
+        () => {
+          fetchStandings();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(matchesChannel);
+      supabase.removeChannel(mpChannel);
     };
-  }, [tournamentId]);
+  }, [tournamentId, tournamentType]);
 
   const fetchStandings = async () => {
-    // @ts-ignore - RPC function type not yet updated in generated types
-    const { data, error } = await supabase.rpc("get_tournament_standings", {
-      tournament_id_input: tournamentId,
-    });
+    if (tournamentType === "catan") {
+      // @ts-ignore - RPC function type not yet updated in generated types
+      const { data, error } = await supabase.rpc("get_catan_tournament_standings", {
+        tournament_id_input: tournamentId,
+      });
 
-    if (error) {
-      toast.error("Failed to load standings");
-      return;
+      if (error) {
+        toast.error("Failed to load standings");
+        return;
+      }
+      setStandings(data || []);
+    } else {
+      // @ts-ignore - RPC function type not yet updated in generated types
+      const { data, error } = await supabase.rpc("get_tournament_standings", {
+        tournament_id_input: tournamentId,
+      });
+
+      if (error) {
+        toast.error("Failed to load standings");
+        return;
+      }
+      setStandings(data || []);
     }
-    setStandings(data || []);
   };
 
   const getRankIcon = (index: number) => {

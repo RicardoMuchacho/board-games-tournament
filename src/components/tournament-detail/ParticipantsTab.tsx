@@ -10,9 +10,10 @@ interface ParticipantsTabProps {
   tournamentId: string;
   tournamentType: string;
   maxParticipants?: number;
+  numberOfRounds?: number;
 }
 
-export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants }: ParticipantsTabProps) => {
+export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds }: ParticipantsTabProps) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,46 +108,63 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants 
 
     setLoading(true);
     try {
-      // Delete existing matches
+      // Delete existing matches and match_participants
       await supabase.from("matches").delete().eq("tournament_id", tournamentId);
 
       const matches: any[] = [];
-      const shuffled = [...participants].sort(() => Math.random() - 0.5);
+      const matchParticipants: any[] = [];
+      const rounds = numberOfRounds || 1;
 
       if (tournamentType === "catan") {
-        // Catan: create matches with 3-4 players each
-        for (let i = 0; i < shuffled.length; i += 4) {
-          const matchPlayers = shuffled.slice(i, Math.min(i + 4, shuffled.length));
+        // Catan: create matches with 3-4 players each for all rounds
+        for (let round = 1; round <= rounds; round++) {
+          const shuffled = [...participants].sort(() => Math.random() - 0.5);
           
-          // Only create match if we have at least 3 players
-          if (matchPlayers.length >= 3) {
-            matches.push({
-              tournament_id: tournamentId,
-              round: 1,
-              player1_id: matchPlayers[0]?.id,
-              player2_id: matchPlayers[1]?.id,
-              player3_id: matchPlayers[2]?.id,
-              player4_id: matchPlayers[3]?.id || null,
-              status: "pending",
-            });
+          for (let i = 0; i < shuffled.length; i += 4) {
+            const matchPlayers = shuffled.slice(i, Math.min(i + 4, shuffled.length));
+            
+            // Only create match if we have at least 3 players
+            if (matchPlayers.length >= 3) {
+              const matchId = crypto.randomUUID();
+              matches.push({
+                id: matchId,
+                tournament_id: tournamentId,
+                round: round,
+                player1_id: matchPlayers[0]?.id,
+                player2_id: matchPlayers[1]?.id,
+                player3_id: matchPlayers[2]?.id,
+                player4_id: matchPlayers[3]?.id || null,
+                status: "pending",
+              });
+
+              // Create match_participants entries for each player
+              matchPlayers.forEach((player) => {
+                matchParticipants.push({
+                  match_id: matchId,
+                  participant_id: player.id,
+                  victory_points: 0,
+                  tournament_points: 0,
+                });
+              });
+            }
           }
         }
       } else if (tournamentType === "round_robin") {
         // Round robin: everyone plays everyone
-        for (let i = 0; i < shuffled.length; i++) {
-          for (let j = i + 1; j < shuffled.length; j++) {
+        for (let i = 0; i < participants.length; i++) {
+          for (let j = i + 1; j < participants.length; j++) {
             matches.push({
               tournament_id: tournamentId,
               round: 1,
-              player1_id: shuffled[i].id,
-              player2_id: shuffled[j].id,
+              player1_id: participants[i].id,
+              player2_id: participants[j].id,
               status: "pending",
             });
           }
         }
       } else if (tournamentType === "eliminatory") {
         // Single elimination bracket
-        const rounds = Math.ceil(Math.log2(shuffled.length));
+        const shuffled = [...participants].sort(() => Math.random() - 0.5);
         for (let i = 0; i < shuffled.length; i += 2) {
           if (i + 1 < shuffled.length) {
             matches.push({
@@ -159,16 +177,19 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants 
           }
         }
       } else {
-        // Swiss: pair players for round 1
-        for (let i = 0; i < shuffled.length; i += 2) {
-          if (i + 1 < shuffled.length) {
-            matches.push({
-              tournament_id: tournamentId,
-              round: 1,
-              player1_id: shuffled[i].id,
-              player2_id: shuffled[i + 1].id,
-              status: "pending",
-            });
+        // Swiss: pair players for each round
+        for (let round = 1; round <= rounds; round++) {
+          const shuffled = [...participants].sort(() => Math.random() - 0.5);
+          for (let i = 0; i < shuffled.length; i += 2) {
+            if (i + 1 < shuffled.length) {
+              matches.push({
+                tournament_id: tournamentId,
+                round: round,
+                player1_id: shuffled[i].id,
+                player2_id: shuffled[i + 1].id,
+                status: "pending",
+              });
+            }
           }
         }
       }
@@ -176,7 +197,16 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants 
       const { error } = await supabase.from("matches").insert(matches);
       if (error) throw error;
 
-      toast.success(`Generated ${matches.length} matches`);
+      // Insert match_participants for Catan
+      if (tournamentType === "catan" && matchParticipants.length > 0) {
+        // @ts-ignore - match_participants table type not yet in generated types
+        const { error: mpError } = await (supabase as any)
+          .from("match_participants")
+          .insert(matchParticipants);
+        if (mpError) throw mpError;
+      }
+
+      toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
     } catch (error) {
       toast.error("Failed to generate matches");
     } finally {

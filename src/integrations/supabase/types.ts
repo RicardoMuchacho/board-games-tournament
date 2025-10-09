@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      match_participants: {
+        Row: {
+          created_at: string | null
+          id: string
+          match_id: string
+          participant_id: string
+          placement: number | null
+          tournament_points: number | null
+          victory_points: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          match_id: string
+          participant_id: string
+          placement?: number | null
+          tournament_points?: number | null
+          victory_points?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          match_id?: string
+          participant_id?: string
+          placement?: number | null
+          tournament_points?: number | null
+          victory_points?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_participants_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_participants_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           created_at: string | null
@@ -192,6 +237,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_catan_tournament_standings: {
+        Args: { tournament_id_input: string }
+        Returns: {
+          id: string
+          matches_played: number
+          name: string
+          total_tournament_points: number
+          total_victory_points: number
+          tournament_id: string
+        }[]
+      }
       get_tournament_standings: {
         Args: { tournament_id_input: string }
         Returns: {
