@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Shuffle } from "lucide-react";
 import { toast } from "sonner";
+import { 
+  generateCatanPairings, 
+  generateSwissPairings, 
+  generateRoundRobinPairings, 
+  generateEliminatoryPairings 
+} from "@/lib/tournamentPairing";
 
 interface ParticipantsTabProps {
   tournamentId: string;
@@ -116,32 +122,23 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
       const rounds = numberOfRounds || 1;
 
       if (tournamentType === "catan") {
-        // Catan: create matches with 3-4 players each for all rounds
-        const roundPlayerAssignments: { [round: number]: any[][] } = {};
+        // Generate Catan pairings with no repeats
+        const allRoundMatches = generateCatanPairings(participants, rounds);
         
         for (let round = 1; round <= rounds; round++) {
-          const shuffled = [...participants].sort(() => Math.random() - 0.5);
-          const roundMatches: any[][] = [];
+          const roundMatches = allRoundMatches[round - 1] || [];
           
-          for (let i = 0; i < shuffled.length; i += 4) {
-            const matchPlayers = shuffled.slice(i, Math.min(i + 4, shuffled.length));
-            
-            // Only create match if we have at least 3 players
-            if (matchPlayers.length >= 3) {
-              roundMatches.push(matchPlayers);
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: matchPlayers[0]?.id,
-                player2_id: matchPlayers[1]?.id,
-                player3_id: matchPlayers[2]?.id,
-                player4_id: matchPlayers[3]?.id || null,
-                status: "pending",
-              });
-            }
+          for (const matchPlayers of roundMatches) {
+            matches.push({
+              tournament_id: tournamentId,
+              round: round,
+              player1_id: matchPlayers[0]?.id,
+              player2_id: matchPlayers[1]?.id,
+              player3_id: matchPlayers[2]?.id,
+              player4_id: matchPlayers[3]?.id || null,
+              status: "pending",
+            });
           }
-          
-          roundPlayerAssignments[round] = roundMatches;
         }
 
         // Insert matches first
@@ -152,16 +149,15 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
         
         if (matchError) throw matchError;
 
-        // Now create match_participants using the same player assignments
+        // Create match_participants using the pairing results
         if (insertedMatches) {
+          let matchIndex = 0;
           for (let round = 1; round <= rounds; round++) {
-            const roundMatches = insertedMatches.filter(m => m.round === round);
-            const roundPlayersList = roundPlayerAssignments[round];
+            const roundMatches = allRoundMatches[round - 1] || [];
             
-            for (let i = 0; i < roundMatches.length; i++) {
-              const match = roundMatches[i];
-              const matchPlayers = roundPlayersList[i];
-
+            for (const matchPlayers of roundMatches) {
+              const match = insertedMatches[matchIndex++];
+              
               for (const player of matchPlayers) {
                 matchParticipants.push({
                   match_id: match.id,
@@ -185,17 +181,18 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
 
         toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       } else if (tournamentType === "round_robin") {
-        // Round robin: everyone plays everyone
-        for (let i = 0; i < participants.length; i++) {
-          for (let j = i + 1; j < participants.length; j++) {
-            matches.push({
-              tournament_id: tournamentId,
-              round: 1,
-              player1_id: participants[i].id,
-              player2_id: participants[j].id,
-              status: "pending",
-            });
-          }
+        // Generate Round Robin pairings
+        const allRoundMatches = generateRoundRobinPairings(participants);
+        const roundMatches = allRoundMatches[0];
+        
+        for (const [player1, player2] of roundMatches) {
+          matches.push({
+            tournament_id: tournamentId,
+            round: 1,
+            player1_id: player1.id,
+            player2_id: player2.id,
+            status: "pending",
+          });
         }
 
         const { error } = await supabase.from("matches").insert(matches);
@@ -203,18 +200,18 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
 
         toast.success(`Generated ${matches.length} matches`);
       } else if (tournamentType === "eliminatory") {
-        // Single elimination bracket
-        const shuffled = [...participants].sort(() => Math.random() - 0.5);
-        for (let i = 0; i < shuffled.length; i += 2) {
-          if (i + 1 < shuffled.length) {
-            matches.push({
-              tournament_id: tournamentId,
-              round: 1,
-              player1_id: shuffled[i].id,
-              player2_id: shuffled[i + 1].id,
-              status: "pending",
-            });
-          }
+        // Generate Eliminatory bracket
+        const allRoundMatches = generateEliminatoryPairings(participants);
+        const roundMatches = allRoundMatches[0];
+        
+        for (const [player1, player2] of roundMatches) {
+          matches.push({
+            tournament_id: tournamentId,
+            round: 1,
+            player1_id: player1.id,
+            player2_id: player2.id,
+            status: "pending",
+          });
         }
 
         const { error } = await supabase.from("matches").insert(matches);
@@ -222,19 +219,20 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
 
         toast.success(`Generated ${matches.length} matches`);
       } else {
-        // Swiss: pair players for each round
+        // Swiss: Generate pairings with no repeats
+        const allRoundMatches = generateSwissPairings(participants, rounds);
+        
         for (let round = 1; round <= rounds; round++) {
-          const shuffled = [...participants].sort(() => Math.random() - 0.5);
-          for (let i = 0; i < shuffled.length; i += 2) {
-            if (i + 1 < shuffled.length) {
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: shuffled[i].id,
-                player2_id: shuffled[i + 1].id,
-                status: "pending",
-              });
-            }
+          const roundMatches = allRoundMatches[round - 1] || [];
+          
+          for (const [player1, player2] of roundMatches) {
+            matches.push({
+              tournament_id: tournamentId,
+              round: round,
+              player1_id: player1.id,
+              player2_id: player2.id,
+              status: "pending",
+            });
           }
         }
 
