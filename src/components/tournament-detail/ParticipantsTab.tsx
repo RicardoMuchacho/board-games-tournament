@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ interface ParticipantsTabProps {
 }
 
 export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds }: ParticipantsTabProps) => {
+  const navigate = useNavigate();
   const [participants, setParticipants] = useState<any[]>([]);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -279,14 +281,25 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
 
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
         {participants.map((participant) => (
-          <Card key={participant.id}>
+          <Card 
+            key={participant.id}
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
+          >
             <CardContent className="flex items-center justify-between p-4">
-              <span className="font-medium">{participant.name}</span>
+              <span 
+                className="font-medium flex-1"
+                onClick={() => navigate(`/participant/${participant.id}`)}
+              >
+                {participant.name}
+              </span>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-destructive"
-                onClick={() => deleteParticipant(participant.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteParticipant(participant.id);
+                }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
