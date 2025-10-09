@@ -190,7 +190,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "moderator" | "user"
       match_status: "pending" | "in_progress" | "completed"
-      tournament_type: "swiss" | "eliminatory" | "round_robin"
+      tournament_type: "swiss" | "eliminatory" | "round_robin" | "catan"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -320,7 +320,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "moderator", "user"],
       match_status: ["pending", "in_progress", "completed"],
-      tournament_type: ["swiss", "eliminatory", "round_robin"],
+      tournament_type: ["swiss", "eliminatory", "round_robin", "catan"],
     },
   },
 } as const
