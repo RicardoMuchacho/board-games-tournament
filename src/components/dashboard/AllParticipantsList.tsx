@@ -35,9 +35,9 @@ export function AllParticipantsList() {
           id,
           name,
           tournament_id,
-          tournament:tournaments!inner(id, created_by, type)
+          tournaments!inner(id, created_by, type)
         `)
-        .eq('tournament.created_by', user.id);
+        .eq('tournaments.created_by', user.id);
 
       if (error) throw error;
 
