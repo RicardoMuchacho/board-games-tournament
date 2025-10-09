@@ -60,24 +60,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "matches_player1_id_fkey"
-            columns: ["player1_id"]
-            isOneToOne: false
-            referencedRelation: "tournament_standings"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "matches_player2_id_fkey"
             columns: ["player2_id"]
             isOneToOne: false
             referencedRelation: "participants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "matches_player2_id_fkey"
-            columns: ["player2_id"]
-            isOneToOne: false
-            referencedRelation: "tournament_standings"
             referencedColumns: ["id"]
           },
           {
@@ -147,30 +133,22 @@ export type Database = {
       }
     }
     Views: {
-      tournament_standings: {
-        Row: {
-          draws: number | null
-          id: string | null
-          losses: number | null
-          matches_played: number | null
-          name: string | null
-          total_score: number | null
-          tournament_id: string | null
-          wins: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "participants_tournament_id_fkey"
-            columns: ["tournament_id"]
-            isOneToOne: false
-            referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_tournament_standings: {
+        Args: { tournament_id_input: string }
+        Returns: {
+          draws: number
+          id: string
+          losses: number
+          matches_played: number
+          name: string
+          total_score: number
+          tournament_id: string
+          wins: number
+        }[]
+      }
     }
     Enums: {
       match_status: "pending" | "in_progress" | "completed"
