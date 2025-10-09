@@ -70,7 +70,7 @@ export function generateCatanPairings(
     const roundMatches: Participant[][] = [];
     const availablePlayers = [...participants];
     let attempts = 0;
-    const maxAttempts = 100;
+    const maxAttempts = 1000;
     
     while (availablePlayers.length >= 3 && attempts < maxAttempts) {
       attempts++;
@@ -81,7 +81,7 @@ export function generateCatanPairings(
       let minConflicts = Infinity;
       
       // Try multiple random combinations to find one with fewest conflicts
-      for (let trial = 0; trial < 20; trial++) {
+      for (let trial = 0; trial < 50; trial++) {
         const shuffled = [...availablePlayers].sort(() => Math.random() - 0.5);
         const candidate = shuffled.slice(0, matchSize);
         
@@ -99,12 +99,13 @@ export function generateCatanPairings(
           minConflicts = conflicts;
           bestMatch = candidate;
           
-          // If we found a perfect match (no conflicts), use it
+          // If we found a perfect match (no conflicts), use it immediately
           if (conflicts === 0) break;
         }
       }
       
-      if (bestMatch) {
+      // Only accept matches with conflicts if we've tried many times
+      if (bestMatch && (minConflicts === 0 || attempts > 50)) {
         roundMatches.push(bestMatch);
         
         // Update history
@@ -124,6 +125,9 @@ export function generateCatanPairings(
         });
         
         attempts = 0; // Reset attempts counter on success
+      } else if (!bestMatch) {
+        // If we couldn't find any match, break to prevent infinite loop
+        break;
       }
     }
     
@@ -151,34 +155,60 @@ export function generateSwissPairings(
   for (let round = 1; round <= rounds; round++) {
     const roundMatches: Participant[][] = [];
     const availablePlayers = [...participants];
+    let attempts = 0;
+    const maxAttempts = 100;
     
-    // Shuffle for first round, otherwise pair randomly avoiding repeats
+    // Shuffle to randomize initial order
     const shuffled = [...availablePlayers].sort(() => Math.random() - 0.5);
     
-    while (shuffled.length >= 2) {
-      const player1 = shuffled.shift()!;
+    while (shuffled.length >= 2 && attempts < maxAttempts) {
+      attempts++;
+      let pairedThisIteration = false;
       
-      // Find best opponent who hasn't played player1 yet
-      let opponentIndex = -1;
-      for (let i = 0; i < shuffled.length; i++) {
-        if (!history[player1.id].has(shuffled[i].id)) {
-          opponentIndex = i;
-          break;
+      // Try to find a valid pairing without repeats
+      for (let i = 0; i < shuffled.length - 1; i++) {
+        const player1 = shuffled[i];
+        
+        // Find opponent who hasn't played player1
+        for (let j = i + 1; j < shuffled.length; j++) {
+          const player2 = shuffled[j];
+          
+          if (!history[player1.id].has(player2.id)) {
+            // Found a valid pairing
+            roundMatches.push([player1, player2]);
+            
+            // Update history
+            history[player1.id].add(player2.id);
+            history[player2.id].add(player1.id);
+            
+            // Remove both players from shuffled array
+            shuffled.splice(j, 1); // Remove player2 first (higher index)
+            shuffled.splice(i, 1); // Then remove player1
+            
+            pairedThisIteration = true;
+            attempts = 0; // Reset attempts on success
+            break;
+          }
         }
+        
+        if (pairedThisIteration) break;
       }
       
-      // If no opponent found without history, just take the first available
-      if (opponentIndex === -1 && shuffled.length > 0) {
-        opponentIndex = 0;
-      }
-      
-      if (opponentIndex !== -1) {
-        const player2 = shuffled.splice(opponentIndex, 1)[0];
+      // If no valid pairing found and we've tried enough times, pair anyway
+      if (!pairedThisIteration && shuffled.length >= 2 && attempts > 50) {
+        const player1 = shuffled.shift()!;
+        const player2 = shuffled.shift()!;
+        
         roundMatches.push([player1, player2]);
         
         // Update history
         history[player1.id].add(player2.id);
         history[player2.id].add(player1.id);
+        
+        attempts = 0;
+      } else if (!pairedThisIteration && attempts >= maxAttempts) {
+        // Prevent infinite loop
+        break;
       }
     }
     
