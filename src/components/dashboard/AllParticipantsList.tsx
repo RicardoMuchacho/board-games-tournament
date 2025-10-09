@@ -26,6 +26,7 @@ export function AllParticipantsList() {
   const fetchAllParticipants = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.id);
       if (!user) return;
 
       // Get all participants from tournaments created by this user
@@ -39,6 +40,7 @@ export function AllParticipantsList() {
         `)
         .eq('tournaments.created_by', user.id);
 
+      console.log('Participants query result:', { participants, error });
       if (error) throw error;
 
       // Get all matches for these participants
