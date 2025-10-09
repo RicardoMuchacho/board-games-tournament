@@ -240,6 +240,7 @@ export type Database = {
       get_catan_tournament_standings: {
         Args: { tournament_id_input: string }
         Returns: {
+          first_positions: number
           id: string
           matches_played: number
           name: string

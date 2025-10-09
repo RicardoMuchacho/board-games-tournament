@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Trophy, Medal, Award } from "lucide-react";
 import { toast } from "sonner";
 
@@ -98,6 +99,7 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
                 <TableHead className="w-12">Rank</TableHead>
                 <TableHead>Player</TableHead>
                 <TableHead className="text-center">Played</TableHead>
+                <TableHead className="text-center">1st Place</TableHead>
                 <TableHead className="text-center">Victory Points</TableHead>
                 <TableHead className="text-center">Tournament Points</TableHead>
               </TableRow>
@@ -113,6 +115,9 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
                   </TableCell>
                   <TableCell className="font-medium">{standing.name}</TableCell>
                   <TableCell className="text-center">{standing.matches_played || 0}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary">{standing.first_positions || 0}</Badge>
+                  </TableCell>
                   <TableCell className="text-center font-bold text-primary">{standing.total_victory_points || 0}</TableCell>
                   <TableCell className="text-center font-semibold">{standing.total_tournament_points || 0}</TableCell>
                 </TableRow>
