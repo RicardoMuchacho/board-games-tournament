@@ -7,9 +7,10 @@ import { toast } from "sonner";
 
 interface LeaderboardTabProps {
   tournamentId: string;
+  tournamentType: string;
 }
 
-export const LeaderboardTab = ({ tournamentId }: LeaderboardTabProps) => {
+export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabProps) => {
   const [standings, setStandings] = useState<any[]>([]);
 
   useEffect(() => {
@@ -65,6 +66,34 @@ export const LeaderboardTab = ({ tournamentId }: LeaderboardTabProps) => {
             <p>No standings available yet</p>
             <p className="text-sm mt-2">Complete some matches to see the leaderboard</p>
           </div>
+        ) : tournamentType === "catan" ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">Rank</TableHead>
+                <TableHead>Player</TableHead>
+                <TableHead className="text-center">Played</TableHead>
+                <TableHead className="text-center">Victory Points</TableHead>
+                <TableHead className="text-center">Tournament Points</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {standings.map((standing, index) => (
+                <TableRow key={standing.id} className={index < 3 ? "bg-muted/30" : ""}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {getRankIcon(index)}
+                      <span className="font-semibold">{index + 1}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{standing.name}</TableCell>
+                  <TableCell className="text-center">{standing.matches_played || 0}</TableCell>
+                  <TableCell className="text-center font-bold text-primary">{standing.total_victory_points || 0}</TableCell>
+                  <TableCell className="text-center font-semibold">{standing.total_tournament_points || 0}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
           <Table>
             <TableHeader>

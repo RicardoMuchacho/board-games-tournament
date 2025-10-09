@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ParticipantsTab } from "@/components/tournament-detail/ParticipantsTab";
 import { MatchesTab } from "@/components/tournament-detail/MatchesTab";
+import { CatanMatchesTab } from "@/components/tournament-detail/CatanMatchesTab";
 import { LeaderboardTab } from "@/components/tournament-detail/LeaderboardTab";
 import { toast } from "sonner";
 
@@ -72,10 +73,14 @@ const TournamentDetail = () => {
             <ParticipantsTab tournamentId={id!} tournamentType={tournament.type} />
           </TabsContent>
           <TabsContent value="matches" className="mt-6">
-            <MatchesTab tournamentId={id!} />
+            {tournament.type === "catan" ? (
+              <CatanMatchesTab tournamentId={id!} />
+            ) : (
+              <MatchesTab tournamentId={id!} />
+            )}
           </TabsContent>
           <TabsContent value="leaderboard" className="mt-6">
-            <LeaderboardTab tournamentId={id!} />
+            <LeaderboardTab tournamentId={id!} tournamentType={tournament.type} />
           </TabsContent>
         </Tabs>
       </div>
