@@ -9,103 +9,101 @@ const PrivacyPolicy = () => {
         <Link to="/">
           <Button variant="ghost" className="mb-6">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
+            Back
           </Button>
         </Link>
 
-        <h1 className="text-4xl font-bold mb-8">Política de Privacidad</h1>
+        <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
 
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-6">
           <section>
-            <h2 className="text-2xl font-semibold mb-4">1. Información General</h2>
+            <h2 className="text-2xl font-semibold mb-4">1. General Information</h2>
             <p className="text-muted-foreground">
-              En cumplimiento del Reglamento (UE) 2016/679 del Parlamento Europeo y del Consejo, 
-              de 27 de abril de 2016, relativo a la protección de las personas físicas en lo que 
-              respecta al tratamiento de datos personales (RGPD), y la Ley Orgánica 3/2018, de 5 
-              de diciembre, de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD), 
-              KLEFF Barcelona informa a los usuarios de esta plataforma sobre su política de protección de datos.
+              In compliance with Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 
+              on the protection of natural persons with regard to the processing of personal data (GDPR), and Spanish 
+              Organic Law 3/2018 of 5 December on the Protection of Personal Data and guarantee of digital rights (LOPDGDD), 
+              KLEFF Barcelona informs users of this platform about its data protection policy.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">2. Responsable del Tratamiento</h2>
+            <h2 className="text-2xl font-semibold mb-4">2. Data Controller</h2>
             <p className="text-muted-foreground">
               KLEFF Barcelona<br />
-              Comunidad de juegos de mesa<br />
+              Board game community<br />
               Meetup: <a href="https://www.meetup.com/kleff-bcn/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">https://www.meetup.com/kleff-bcn/</a>
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">3. Datos Recopilados</h2>
+            <h2 className="text-2xl font-semibold mb-4">3. Data Collected</h2>
             <p className="text-muted-foreground mb-2">
-              La plataforma recopila los siguientes datos personales:
+              The platform collects the following personal data:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>Nombre de usuario</li>
-              <li>Dirección de correo electrónico</li>
-              <li>Información de participación en torneos</li>
-              <li>Resultados y estadísticas de juego</li>
+              <li>Username</li>
+              <li>Email address</li>
+              <li>Tournament participation information</li>
+              <li>Game results and statistics</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">4. Finalidad del Tratamiento</h2>
+            <h2 className="text-2xl font-semibold mb-4">4. Purpose of Processing</h2>
             <p className="text-muted-foreground mb-2">
-              Los datos personales se utilizan para:
+              Personal data is used for:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>Gestión de torneos y eventos</li>
-              <li>Registro y autenticación de usuarios</li>
-              <li>Seguimiento de participación y resultados</li>
-              <li>Comunicaciones relacionadas con los torneos</li>
+              <li>Tournament and event management</li>
+              <li>User registration and authentication</li>
+              <li>Participation and results tracking</li>
+              <li>Tournament-related communications</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">5. Base Legal</h2>
+            <h2 className="text-2xl font-semibold mb-4">5. Legal Basis</h2>
             <p className="text-muted-foreground">
-              El tratamiento de datos se basa en el consentimiento del usuario al registrarse en la plataforma 
-              y la ejecución del servicio de gestión de torneos.
+              Data processing is based on user consent upon registration and the execution of the tournament management service.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">6. Derechos del Usuario</h2>
+            <h2 className="text-2xl font-semibold mb-4">6. User Rights</h2>
             <p className="text-muted-foreground mb-2">
-              Los usuarios tienen derecho a:
+              Users have the right to:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>Acceso a sus datos personales</li>
-              <li>Rectificación de datos inexactos</li>
-              <li>Supresión de sus datos</li>
-              <li>Limitación del tratamiento</li>
-              <li>Portabilidad de datos</li>
-              <li>Oposición al tratamiento</li>
+              <li>Access their personal data</li>
+              <li>Rectify inaccurate data</li>
+              <li>Delete their data</li>
+              <li>Limit processing</li>
+              <li>Data portability</li>
+              <li>Object to processing</li>
             </ul>
             <p className="text-muted-foreground mt-2">
-              Para ejercer estos derechos, contacte a través de los canales de Meetup de KLEFF Barcelona.
+              To exercise these rights, contact us through KLEFF Barcelona's Meetup channels.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Seguridad de los Datos</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Data Security</h2>
             <p className="text-muted-foreground">
-              KLEFF Barcelona implementa medidas técnicas y organizativas apropiadas para proteger 
-              los datos personales contra el acceso no autorizado, pérdida o alteración.
+              KLEFF Barcelona implements appropriate technical and organizational measures to protect personal data 
+              against unauthorized access, loss, or alteration.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">8. Conservación de Datos</h2>
+            <h2 className="text-2xl font-semibold mb-4">8. Data Retention</h2>
             <p className="text-muted-foreground">
-              Los datos se conservarán mientras el usuario mantenga su cuenta activa y durante el 
-              tiempo necesario para cumplir con las obligaciones legales.
+              Data will be retained while the user maintains an active account and for the time necessary to 
+              comply with legal obligations.
             </p>
           </section>
 
           <p className="text-sm text-muted-foreground mt-8">
-            Última actualización: {new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+            Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
       </div>

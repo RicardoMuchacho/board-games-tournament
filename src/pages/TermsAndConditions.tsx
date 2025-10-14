@@ -9,121 +9,118 @@ const TermsAndConditions = () => {
         <Link to="/">
           <Button variant="ghost" className="mb-6">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
+            Back
           </Button>
         </Link>
 
-        <h1 className="text-4xl font-bold mb-8">Términos y Condiciones</h1>
+        <h1 className="text-4xl font-bold mb-8">Terms and Conditions</h1>
 
         <div className="prose prose-slate dark:prose-invert max-w-none space-y-6">
           <section>
-            <h2 className="text-2xl font-semibold mb-4">1. Aceptación de los Términos</h2>
+            <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p className="text-muted-foreground">
-              Al acceder y utilizar esta plataforma de gestión de torneos, usted acepta estar sujeto 
-              a estos términos y condiciones de uso. Si no está de acuerdo con alguno de estos términos, 
-              no debe utilizar esta plataforma.
+              By accessing and using this tournament management platform, you agree to be bound by these terms 
+              and conditions. If you do not agree with any of these terms, you should not use this platform.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">2. Descripción del Servicio</h2>
+            <h2 className="text-2xl font-semibold mb-4">2. Service Description</h2>
             <p className="text-muted-foreground">
-              Esta plataforma, creada por KLEFF Barcelona, proporciona herramientas para la gestión 
-              de torneos de juegos de mesa, incluyendo registro de participantes, emparejamiento, 
-              seguimiento de resultados y clasificaciones.
+              This platform, created by KLEFF Barcelona, provides tools for managing board game tournaments, 
+              including participant registration, match pairings, result tracking, and leaderboards.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">3. Registro de Usuario</h2>
+            <h2 className="text-2xl font-semibold mb-4">3. User Registration</h2>
             <p className="text-muted-foreground mb-2">
-              Para utilizar ciertas funciones de la plataforma, debe registrarse proporcionando:
+              To use certain features of the platform, you must register by providing:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>Información veraz y actualizada</li>
-              <li>Una dirección de correo electrónico válida</li>
-              <li>Un nombre de usuario único</li>
+              <li>Truthful and up-to-date information</li>
+              <li>A valid email address</li>
+              <li>A unique username</li>
             </ul>
             <p className="text-muted-foreground mt-2">
-              Usted es responsable de mantener la confidencialidad de su cuenta y contraseña.
+              You are responsible for maintaining the confidentiality of your account and password.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">4. Uso Aceptable</h2>
+            <h2 className="text-2xl font-semibold mb-4">4. Acceptable Use</h2>
             <p className="text-muted-foreground mb-2">
-              Al utilizar esta plataforma, se compromete a:
+              By using this platform, you agree to:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>No proporcionar información falsa o engañosa</li>
-              <li>No interferir con el funcionamiento de la plataforma</li>
-              <li>Respetar a otros usuarios y participantes</li>
-              <li>No utilizar la plataforma para fines ilegales</li>
-              <li>Cumplir con las reglas de los torneos organizados</li>
+              <li>Not provide false or misleading information</li>
+              <li>Not interfere with the platform's operation</li>
+              <li>Respect other users and participants</li>
+              <li>Not use the platform for illegal purposes</li>
+              <li>Comply with tournament rules</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">5. Propiedad Intelectual</h2>
+            <h2 className="text-2xl font-semibold mb-4">5. Intellectual Property</h2>
             <p className="text-muted-foreground">
-              Todo el contenido de esta plataforma, incluyendo diseño, código, textos y logotipos, 
-              es propiedad de KLEFF Barcelona y está protegido por las leyes de propiedad intelectual españolas 
-              y europeas. Queda prohibida su reproducción sin autorización expresa.
+              All content on this platform, including design, code, text, and logos, is the property of 
+              KLEFF Barcelona and is protected by Spanish and European intellectual property laws. 
+              Reproduction without express authorization is prohibited.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">6. Privacidad y Protección de Datos</h2>
+            <h2 className="text-2xl font-semibold mb-4">6. Privacy and Data Protection</h2>
             <p className="text-muted-foreground">
-              El tratamiento de sus datos personales se rige por nuestra{" "}
+              The processing of your personal data is governed by our{" "}
               <Link to="/privacy-policy" className="text-primary hover:underline">
-                Política de Privacidad
+                Privacy Policy
               </Link>
-              , en cumplimiento del RGPD y la LOPDGDD.
+              , in compliance with GDPR and LOPDGDD.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Limitación de Responsabilidad</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Limitation of Liability</h2>
             <p className="text-muted-foreground">
-              KLEFF Barcelona no se hace responsable de:
+              KLEFF Barcelona is not responsible for:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>Interrupciones temporales del servicio</li>
-              <li>Pérdida de datos debido a causas técnicas</li>
-              <li>Disputas entre usuarios o participantes</li>
-              <li>Contenido generado por los usuarios</li>
+              <li>Temporary service interruptions</li>
+              <li>Data loss due to technical causes</li>
+              <li>Disputes between users or participants</li>
+              <li>User-generated content</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">8. Modificaciones del Servicio</h2>
+            <h2 className="text-2xl font-semibold mb-4">8. Service Modifications</h2>
             <p className="text-muted-foreground">
-              KLEFF Barcelona se reserva el derecho de modificar, suspender o discontinuar cualquier 
-              aspecto de la plataforma en cualquier momento, con o sin previo aviso.
+              KLEFF Barcelona reserves the right to modify, suspend, or discontinue any aspect of the 
+              platform at any time, with or without prior notice.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">9. Suspensión de Cuenta</h2>
+            <h2 className="text-2xl font-semibold mb-4">9. Account Suspension</h2>
             <p className="text-muted-foreground">
-              Nos reservamos el derecho de suspender o eliminar cuentas que violen estos términos 
-              o que se utilicen de manera inapropiada.
+              We reserve the right to suspend or delete accounts that violate these terms or are used inappropriately.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">10. Ley Aplicable y Jurisdicción</h2>
+            <h2 className="text-2xl font-semibold mb-4">10. Applicable Law and Jurisdiction</h2>
             <p className="text-muted-foreground">
-              Estos términos se rigen por la legislación española. Para cualquier controversia, 
-              las partes se someten a los juzgados y tribunales de Barcelona, España.
+              These terms are governed by Spanish law. For any disputes, the parties submit to the courts 
+              and tribunals of Barcelona, Spain.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">11. Contacto</h2>
+            <h2 className="text-2xl font-semibold mb-4">11. Contact</h2>
             <p className="text-muted-foreground">
-              Para cualquier consulta sobre estos términos y condiciones, puede contactarnos a través de:{" "}
+              For any questions about these terms and conditions, you can contact us through:{" "}
               <a href="https://www.meetup.com/kleff-bcn/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 KLEFF Barcelona Meetup
               </a>
@@ -131,15 +128,15 @@ const TermsAndConditions = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">12. Modificaciones de los Términos</h2>
+            <h2 className="text-2xl font-semibold mb-4">12. Modifications to Terms</h2>
             <p className="text-muted-foreground">
-              Estos términos y condiciones pueden actualizarse periódicamente. El uso continuado 
-              de la plataforma tras la publicación de cambios constituye su aceptación de los mismos.
+              These terms and conditions may be updated periodically. Continued use of the platform after 
+              the publication of changes constitutes acceptance of those changes.
             </p>
           </section>
 
           <p className="text-sm text-muted-foreground mt-8">
-            Última actualización: {new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+            Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
       </div>
