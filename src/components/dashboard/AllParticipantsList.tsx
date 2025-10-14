@@ -26,31 +26,19 @@ export function AllParticipantsList() {
   const fetchAllParticipants = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user?.id);
       if (!user) return;
 
       // Get all participants from tournaments created by this user
-      // First get tournament IDs
-      const { data: tournaments } = await supabase
-        .from('tournaments')
-        .select('id')
-        .eq('created_by', user.id);
-      
-      if (!tournaments || tournaments.length === 0) {
-        setParticipants([]);
-        setLoading(false);
-        return;
-      }
-
-      const tournamentIds = tournaments.map(t => t.id);
-
       const { data: participantsData, error: participantsError } = await supabase
         .from('participants')
-        .select('id, name, tournament_id')
-        .in('tournament_id', tournamentIds);
+        .select(`
+          id, 
+          name, 
+          tournament_id,
+          tournaments!inner(created_by)
+        `)
+        .eq('tournaments.created_by', user.id);
 
-      console.log('Participants query result:', { participantsData, participantsError });
-      
       if (participantsError) {
         console.error('Error fetching participants:', participantsError);
         return;
@@ -76,7 +64,21 @@ export function AllParticipantsList() {
           tournament_id
         `)
         .eq('status', 'completed')
-        .or(`player1_id.in.(${participantIds.join(',')}),player2_id.in.(${participantIds.join(',')})`, { referencedTable: 'matches' });
+        .in('player1_id', participantIds);
+
+      const { data: matches2, error: matches2Error } = await supabase
+        .from('matches')
+        .select(`
+          id,
+          status,
+          player1_id,
+          player2_id,
+          player1_score,
+          player2_score,
+          tournament_id
+        `)
+        .eq('status', 'completed')
+        .in('player2_id', participantIds);
 
       const { data: matchParticipants, error: mpError } = await supabase
         .from('match_participants')
@@ -84,7 +86,11 @@ export function AllParticipantsList() {
         .in('participant_id', participantIds);
 
       if (matchesError) throw matchesError;
+      if (matches2Error) throw matches2Error;
       if (mpError) throw mpError;
+
+      // Combine both match queries
+      const allMatches = [...(matches || []), ...(matches2 || [])];
 
       // Calculate stats for each unique participant name
       const participantMap = new Map<string, {
@@ -109,7 +115,7 @@ export function AllParticipantsList() {
         stats.tournament_count++;
 
         // Count wins from regular matches
-        const wins = matches?.filter(m => 
+        const wins = allMatches?.filter(m => 
           (m.player1_id === p.id && m.player1_score > m.player2_score) ||
           (m.player2_id === p.id && m.player2_score > m.player1_score)
         ).length || 0;
