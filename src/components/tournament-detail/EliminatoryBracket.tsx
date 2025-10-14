@@ -16,8 +16,11 @@ interface EliminatoryBracketProps {
 }
 
 export const EliminatoryBracket = ({ matches }: EliminatoryBracketProps) => {
+  // Filter out matches where both players are null/undefined (TBD matches that shouldn't display yet)
+  const validMatches = matches.filter(match => match.player1 || match.player2);
+  
   // Group matches by round
-  const groupedMatches = matches.reduce((acc, match) => {
+  const groupedMatches = validMatches.reduce((acc, match) => {
     const round = match.round;
     if (!acc[round]) acc[round] = [];
     acc[round].push(match);
@@ -27,6 +30,16 @@ export const EliminatoryBracket = ({ matches }: EliminatoryBracketProps) => {
   const rounds = Object.keys(groupedMatches)
     .map(r => parseInt(r))
     .sort((a, b) => a - b);
+
+  if (rounds.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center h-48">
+          <p className="text-muted-foreground">No matches yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const maxRound = Math.max(...rounds);
 
@@ -46,15 +59,6 @@ export const EliminatoryBracket = ({ matches }: EliminatoryBracketProps) => {
     return null;
   };
 
-  if (matches.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center h-48">
-          <p className="text-muted-foreground">No matches yet</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="space-y-8">
