@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Search, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { EditCatanMatchParticipants } from "./EditCatanMatchParticipants";
 
 interface CatanMatchesTabProps {
   tournamentId: string;
@@ -25,6 +26,7 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
   }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingMatch, setEditingMatch] = useState<{ id: string; participantIds: string[] } | null>(null);
 
   useEffect(() => {
     fetchMatches();
@@ -211,17 +213,29 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Table {tableNumber}</CardTitle>
-                      <Badge
-                        variant={
-                          match.status === "completed"
-                            ? "default"
-                            : match.status === "in_progress"
-                            ? "secondary"
-                            : "outline"
-                        }
-                      >
-                        {match.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingMatch({ 
+                            id: match.id, 
+                            participantIds: participants.map(p => p.participant.id) 
+                          })}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Badge
+                          variant={
+                            match.status === "completed"
+                              ? "default"
+                              : match.status === "in_progress"
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {match.status}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -315,6 +329,16 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
             </Card>
           )}
         </>
+      )}
+
+      {editingMatch && (
+        <EditCatanMatchParticipants
+          open={!!editingMatch}
+          onOpenChange={(open) => !open && setEditingMatch(null)}
+          matchId={editingMatch.id}
+          currentParticipantIds={editingMatch.participantIds}
+          tournamentId={tournamentId}
+        />
       )}
     </div>
   );

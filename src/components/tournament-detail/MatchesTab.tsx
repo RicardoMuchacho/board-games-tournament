@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Search, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { EditMatchParticipants } from "./EditMatchParticipants";
 
 interface MatchesTabProps {
   tournamentId: string;
@@ -16,6 +17,7 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
   const [scores, setScores] = useState<{ [key: string]: { p1: number; p2: number } }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingMatch, setEditingMatch] = useState<{ id: string; player1Id?: string; player2Id?: string } | null>(null);
 
   useEffect(() => {
     fetchMatches();
@@ -160,17 +162,30 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Table {tableNumber}</CardTitle>
-                      <Badge
-                        variant={
-                          match.status === "completed"
-                            ? "default"
-                            : match.status === "in_progress"
-                            ? "secondary"
-                            : "outline"
-                        }
-                      >
-                        {match.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingMatch({ 
+                            id: match.id, 
+                            player1Id: match.player1_id, 
+                            player2Id: match.player2_id 
+                          })}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Badge
+                          variant={
+                            match.status === "completed"
+                              ? "default"
+                              : match.status === "in_progress"
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {match.status}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -239,6 +254,17 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
             </Card>
           )}
         </>
+      )}
+
+      {editingMatch && (
+        <EditMatchParticipants
+          open={!!editingMatch}
+          onOpenChange={(open) => !open && setEditingMatch(null)}
+          matchId={editingMatch.id}
+          currentPlayer1Id={editingMatch.player1Id}
+          currentPlayer2Id={editingMatch.player2Id}
+          tournamentId={tournamentId}
+        />
       )}
     </div>
   );
