@@ -24,7 +24,7 @@ interface EliminatoryBracketProps {
 export const EliminatoryBracket = ({ matches, tournamentId }: EliminatoryBracketProps) => {
   const [editingMatch, setEditingMatch] = useState<{ id: string; player1Id?: string; player2Id?: string } | null>(null);
 
-  // Filter out matches where both players are null/undefined (TBD matches that shouldn't display yet)
+  // Filter out matches where both players are null/undefined
   const validMatches = matches.filter(match => match.player1 || match.player2);
   
   // Group matches by round
@@ -56,6 +56,7 @@ export const EliminatoryBracket = ({ matches, tournamentId }: EliminatoryBracket
     if (matchesInRound === 1) return "Final";
     if (matchesInRound === 2) return "Semi-Finals";
     if (matchesInRound === 4) return "Quarter-Finals";
+    if (matchesInRound === 8) return "Round of 16";
     return `Round ${round}`;
   };
 
@@ -67,6 +68,10 @@ export const EliminatoryBracket = ({ matches, tournamentId }: EliminatoryBracket
     return null;
   };
 
+  // Calculate match height and spacing for proper bracket layout
+  const matchHeight = 140; // Height of each match card
+  const matchSpacing = 20; // Spacing between matches in the same round
+  const connectorWidth = 60; // Width of connector lines
 
   return (
     <div className="space-y-8">
@@ -77,86 +82,162 @@ export const EliminatoryBracket = ({ matches, tournamentId }: EliminatoryBracket
             Tournament Bracket
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-8 overflow-x-auto pb-4">
-            {rounds.map((round, roundIndex) => (
-              <div key={round} className="flex-shrink-0 space-y-4" style={{ minWidth: '250px' }}>
-                <h3 className="font-semibold text-center mb-4 sticky top-0 bg-background py-2">
-                  {getRoundName(round)}
-                </h3>
-                <div className="space-y-6" style={{ marginTop: roundIndex > 0 ? `${roundIndex * 2}rem` : '0' }}>
-                  {groupedMatches[round].map((match, matchIndex) => {
-                    const winner = getWinner(match);
-                    const isPlayer1Winner = winner?.id === match.player1?.id;
-                    const isPlayer2Winner = winner?.id === match.player2?.id;
-                    const isFinal = round === maxRound;
+        <CardContent className="overflow-x-auto">
+          <div className="flex gap-4 py-8 px-4" style={{ minWidth: 'max-content' }}>
+            {rounds.map((round, roundIndex) => {
+              const roundMatches = groupedMatches[round];
+              const verticalSpacing = Math.pow(2, roundIndex) * (matchHeight + matchSpacing);
+              const topOffset = (verticalSpacing - matchHeight) / 2;
 
-                    return (
-                      <div
-                        key={match.id}
-                        className="relative"
-                        style={{ marginBottom: roundIndex > 0 ? `${roundIndex * 2}rem` : '1.5rem' }}
-                      >
-                        <Card className={isFinal && winner ? "border-primary shadow-lg" : ""}>
-                          <CardContent className="p-4 space-y-2">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-muted-foreground">Match {matchIndex + 1}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setEditingMatch({ 
-                                  id: match.id, 
-                                  player1Id: match.player1_id, 
-                                  player2Id: match.player2_id 
-                                })}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className={`flex items-center justify-between p-2 rounded ${
-                              isPlayer1Winner ? 'bg-primary/10 border border-primary' : 'bg-muted/50'
-                            }`}>
-                              <span className={`font-medium ${isPlayer1Winner ? 'text-primary' : ''}`}>
-                                {match.player1?.name || "TBD"}
-                              </span>
-                              {match.status === "completed" && (
-                                <span className={`font-bold ${isPlayer1Winner ? 'text-primary' : ''}`}>
-                                  {match.player1_score ?? 0}
+              return (
+                <div key={round} className="flex flex-col relative" style={{ minWidth: '280px' }}>
+                  {/* Round title */}
+                  <div className="text-center mb-6 font-semibold text-lg">
+                    {getRoundName(round)}
+                  </div>
+
+                  {/* Matches for this round */}
+                  <div className="relative flex-1">
+                    {roundMatches.map((match, matchIndex) => {
+                      const winner = getWinner(match);
+                      const isPlayer1Winner = winner?.id === match.player1?.id;
+                      const isPlayer2Winner = winner?.id === match.player2?.id;
+                      const isFinal = round === maxRound;
+                      
+                      const yPosition = matchIndex * verticalSpacing + topOffset;
+
+                      return (
+                        <div
+                          key={match.id}
+                          className="absolute"
+                          style={{ 
+                            top: `${yPosition}px`,
+                            left: 0,
+                            width: '260px'
+                          }}
+                        >
+                          <Card className={`${isFinal && winner ? "border-primary shadow-lg" : ""} bg-card`}>
+                            <CardContent className="p-3 space-y-2">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-muted-foreground font-medium">
+                                  Match {matchIndex + 1}
                                 </span>
-                              )}
-                            </div>
-                            <div className={`flex items-center justify-between p-2 rounded ${
-                              isPlayer2Winner ? 'bg-primary/10 border border-primary' : 'bg-muted/50'
-                            }`}>
-                              <span className={`font-medium ${isPlayer2Winner ? 'text-primary' : ''}`}>
-                                {match.player2?.name || "TBD"}
-                              </span>
-                              {match.status === "completed" && (
-                                <span className={`font-bold ${isPlayer2Winner ? 'text-primary' : ''}`}>
-                                  {match.player2_score ?? 0}
-                                </span>
-                              )}
-                            </div>
-                            {isFinal && winner && (
-                              <div className="flex items-center justify-center gap-2 pt-2 border-t">
-                                <Trophy className="h-4 w-4 text-primary" />
-                                <span className="text-xs font-semibold text-primary">CHAMPION</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => setEditingMatch({ 
+                                    id: match.id, 
+                                    player1Id: match.player1_id, 
+                                    player2Id: match.player2_id 
+                                  })}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
                               </div>
-                            )}
-                          </CardContent>
-                        </Card>
+                              
+                              <div className={`flex items-center justify-between p-2 rounded transition-colors ${
+                                isPlayer1Winner ? 'bg-primary/20 border-2 border-primary' : 'bg-muted/50'
+                              }`}>
+                                <span className={`font-medium text-sm ${isPlayer1Winner ? 'text-primary font-bold' : ''}`}>
+                                  {match.player1?.name || "TBD"}
+                                </span>
+                                {match.status === "completed" && (
+                                  <span className={`font-bold ${isPlayer1Winner ? 'text-primary' : ''}`}>
+                                    {match.player1_score ?? 0}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className={`flex items-center justify-between p-2 rounded transition-colors ${
+                                isPlayer2Winner ? 'bg-primary/20 border-2 border-primary' : 'bg-muted/50'
+                              }`}>
+                                <span className={`font-medium text-sm ${isPlayer2Winner ? 'text-primary font-bold' : ''}`}>
+                                  {match.player2?.name || "TBD"}
+                                </span>
+                                {match.status === "completed" && (
+                                  <span className={`font-bold ${isPlayer2Winner ? 'text-primary' : ''}`}>
+                                    {match.player2_score ?? 0}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {isFinal && winner && (
+                                <div className="flex items-center justify-center gap-2 pt-2 border-t border-primary">
+                                  <Trophy className="h-4 w-4 text-primary" />
+                                  <span className="text-xs font-bold text-primary">CHAMPION</span>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
 
-                        {/* Connector line to next round */}
-                        {roundIndex < rounds.length - 1 && (
-                          <div className="absolute top-1/2 -right-8 w-8 h-0.5 bg-border" />
-                        )}
-                      </div>
-                    );
-                  })}
+                          {/* Connector lines to next round */}
+                          {roundIndex < rounds.length - 1 && (
+                            <svg
+                              className="absolute"
+                              style={{
+                                left: '260px',
+                                top: '50%',
+                                width: `${connectorWidth}px`,
+                                height: `${verticalSpacing}px`,
+                                transform: 'translateY(-50%)',
+                                overflow: 'visible'
+                              }}
+                            >
+                              {/* Horizontal line from match */}
+                              <line
+                                x1="0"
+                                y1="50%"
+                                x2={connectorWidth / 2}
+                                y2="50%"
+                                stroke="hsl(var(--border))"
+                                strokeWidth="2"
+                              />
+                              
+                              {/* Vertical line connecting to pair */}
+                              {matchIndex % 2 === 0 && (
+                                <>
+                                  <line
+                                    x1={connectorWidth / 2}
+                                    y1="50%"
+                                    x2={connectorWidth / 2}
+                                    y2={verticalSpacing / 2 + (matchHeight + matchSpacing) / 2}
+                                    stroke="hsl(var(--border))"
+                                    strokeWidth="2"
+                                  />
+                                  <line
+                                    x1={connectorWidth / 2}
+                                    y1={verticalSpacing / 2 + (matchHeight + matchSpacing) / 2}
+                                    x2={connectorWidth}
+                                    y2={verticalSpacing / 2 + (matchHeight + matchSpacing) / 2}
+                                    stroke="hsl(var(--border))"
+                                    strokeWidth="2"
+                                  />
+                                </>
+                              )}
+                              
+                              {matchIndex % 2 === 1 && (
+                                <line
+                                  x1={connectorWidth / 2}
+                                  y1="50%"
+                                  x2={connectorWidth / 2}
+                                  y2={-(verticalSpacing / 2 - (matchHeight + matchSpacing) / 2)}
+                                  stroke="hsl(var(--border))"
+                                  strokeWidth="2"
+                                />
+                              )}
+                            </svg>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Calculate height for this round column */}
+                  <div style={{ height: `${roundMatches.length * verticalSpacing}px` }} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
