@@ -33,12 +33,18 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
     setLoading(true);
 
     try {
+      // For eliminatory tournaments, calculate rounds automatically
+      let finalNumberOfRounds = numberOfRounds;
+      if (type === "eliminatory" && numberOfParticipants) {
+        finalNumberOfRounds = Math.ceil(Math.log2(numberOfParticipants));
+      }
+
       // Validate input
       const validation = tournamentSchema.safeParse({ 
         name, 
         type,
         number_of_participants: numberOfParticipants,
-        number_of_rounds: numberOfRounds,
+        number_of_rounds: finalNumberOfRounds,
       });
       if (!validation.success) {
         toast.error(validation.error.errors[0].message);
@@ -62,7 +68,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
           status: "active",
           created_by: user.id,
           number_of_participants: validation.data.number_of_participants,
-          number_of_rounds: validation.data.number_of_rounds,
+          number_of_rounds: finalNumberOfRounds,
         },
       ]);
 
@@ -124,18 +130,20 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
               onChange={(e) => setNumberOfParticipants(e.target.value ? parseInt(e.target.value) : undefined)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="rounds">Number of Rounds (Optional)</Label>
-            <Input
-              id="rounds"
-              type="number"
-              min="1"
-              max="50"
-              placeholder="e.g., 5"
-              value={numberOfRounds || ""}
-              onChange={(e) => setNumberOfRounds(e.target.value ? parseInt(e.target.value) : undefined)}
-            />
-          </div>
+          {type !== "eliminatory" && (
+            <div className="space-y-2">
+              <Label htmlFor="rounds">Number of Rounds (Optional)</Label>
+              <Input
+                id="rounds"
+                type="number"
+                min="1"
+                max="50"
+                placeholder="e.g., 5"
+                value={numberOfRounds || ""}
+                onChange={(e) => setNumberOfRounds(e.target.value ? parseInt(e.target.value) : undefined)}
+              />
+            </div>
+          )}
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
