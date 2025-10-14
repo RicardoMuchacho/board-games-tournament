@@ -10,6 +10,9 @@ import TournamentDetail from "./pages/TournamentDetail";
 import TournamentRounds from "./pages/TournamentRounds";
 import ParticipantProfile from "./pages/ParticipantProfile";
 import ParticipantsLeaderboard from "./pages/ParticipantsLeaderboard";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import CookiesPolicy from "./pages/CookiesPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +31,9 @@ const App = () => (
           <Route path="/tournament/:id/rounds" element={<TournamentRounds />} />
           <Route path="/participant/:id" element={<ParticipantProfile />} />
           <Route path="/leaderboard" element={<ParticipantsLeaderboard />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/cookies-policy" element={<CookiesPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
