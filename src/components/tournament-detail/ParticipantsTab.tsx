@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Shuffle } from "lucide-react";
+import { Plus, Trash2, Shuffle, Edit as EditIcon } from "lucide-react";
 import { toast } from "sonner";
+import { EditParticipantDialog } from "./EditParticipantDialog";
 import {
   Command,
   CommandEmpty,
@@ -40,6 +41,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
   const [newName, setNewName] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingParticipant, setEditingParticipant] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchParticipants();
@@ -328,8 +330,28 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
                               <CommandItem
                                 key={name}
                                 value={name}
-                                onSelect={() => {
-                                  setNewName(name);
+                                onSelect={async (selectedName) => {
+                                  if (maxParticipants && participants.length >= maxParticipants) {
+                                    toast.error(`Maximum number of participants (${maxParticipants}) reached`);
+                                    setOpen(false);
+                                    return;
+                                  }
+
+                                  const { error } = await supabase.from("participants").insert([
+                                    {
+                                      tournament_id: tournamentId,
+                                      name: selectedName,
+                                    },
+                                  ]);
+
+                                  if (error) {
+                                    toast.error(error.message || "Failed to add participant");
+                                  } else {
+                                    toast.success("Participant added");
+                                    fetchExistingNames();
+                                  }
+                                  
+                                  setNewName("");
                                   setOpen(false);
                                 }}
                               >
@@ -384,21 +406,43 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
               >
                 {participant.name}
               </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteParticipant(participant.id);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingParticipant({ id: participant.id, name: participant.name });
+                  }}
+                >
+                  <EditIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteParticipant(participant.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {editingParticipant && (
+        <EditParticipantDialog
+          open={!!editingParticipant}
+          onOpenChange={(open) => !open && setEditingParticipant(null)}
+          participantId={editingParticipant.id}
+          currentName={editingParticipant.name}
+        />
+      )}
     </div>
   );
 };

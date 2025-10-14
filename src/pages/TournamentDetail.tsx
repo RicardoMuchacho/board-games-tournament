@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Edit } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EditTournamentDialog } from "@/components/tournament-detail/EditTournamentDialog";
 import { ParticipantsTab } from "@/components/tournament-detail/ParticipantsTab";
 import { MatchesTab } from "@/components/tournament-detail/MatchesTab";
 import { CatanMatchesTab } from "@/components/tournament-detail/CatanMatchesTab";
@@ -15,6 +16,7 @@ const TournamentDetail = () => {
   const navigate = useNavigate();
   const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [editingTournament, setEditingTournament] = useState(false);
 
   useEffect(() => {
     fetchTournament();
@@ -55,12 +57,15 @@ const TournamentDetail = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold">{tournament.name}</h1>
             <p className="text-muted-foreground capitalize">
               {tournament.type.replace("_", " ")} Tournament • {tournament.status}
             </p>
           </div>
+          <Button variant="outline" size="icon" onClick={() => setEditingTournament(true)}>
+            <Edit className="h-5 w-5" />
+          </Button>
         </div>
 
         <Tabs defaultValue="participants" className="w-full">
@@ -88,6 +93,14 @@ const TournamentDetail = () => {
             <LeaderboardTab tournamentId={id!} tournamentType={tournament.type} />
           </TabsContent>
         </Tabs>
+
+        <EditTournamentDialog
+          open={editingTournament}
+          onOpenChange={setEditingTournament}
+          tournamentId={id!}
+          currentName={tournament.name}
+          onUpdate={fetchTournament}
+        />
       </div>
     </div>
   );
