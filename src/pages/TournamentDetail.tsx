@@ -9,6 +9,7 @@ import { ParticipantsTab } from "@/components/tournament-detail/ParticipantsTab"
 import { MatchesTab } from "@/components/tournament-detail/MatchesTab";
 import { CatanMatchesTab } from "@/components/tournament-detail/CatanMatchesTab";
 import { LeaderboardTab } from "@/components/tournament-detail/LeaderboardTab";
+import { EliminatoryLeaderboardTab } from "@/components/tournament-detail/EliminatoryLeaderboardTab";
 import { toast } from "sonner";
 
 const TournamentDetail = () => {
@@ -90,7 +91,11 @@ const TournamentDetail = () => {
             )}
           </TabsContent>
           <TabsContent value="leaderboard" className="mt-6">
-            <LeaderboardTab tournamentId={id!} tournamentType={tournament.type} />
+            {tournament.type === "eliminatory" ? (
+              <EliminatoryLeaderboardTab tournamentId={id!} />
+            ) : (
+              <LeaderboardTab tournamentId={id!} tournamentType={tournament.type} />
+            )}
           </TabsContent>
         </Tabs>
 

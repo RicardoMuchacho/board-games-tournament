@@ -93,6 +93,89 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
       delete newScores[matchId];
       return newScores;
     });
+
+    // Check if we need to generate next round for eliminatory tournament
+    await checkAndGenerateNextRound(matchId);
+  };
+
+  const checkAndGenerateNextRound = async (completedMatchId: string) => {
+    // Get tournament type
+    const { data: tournament } = await supabase
+      .from("tournaments")
+      .select("type")
+      .eq("id", tournamentId)
+      .single();
+
+    if (tournament?.type !== "eliminatory") return;
+
+    // Get the completed match to find its round
+    const completedMatch = matches.find(m => m.id === completedMatchId);
+    if (!completedMatch) return;
+
+    const currentRound = completedMatch.round;
+
+    // Get all matches in current round
+    const currentRoundMatches = matches.filter(m => m.round === currentRound);
+
+    // Check if all matches in current round are completed
+    const allCompleted = currentRoundMatches.every(m => 
+      m.id === completedMatchId || m.status === "completed"
+    );
+
+    if (!allCompleted) return;
+
+    // Get winners from current round
+    const winners: { id: string; name: string }[] = [];
+    for (const match of currentRoundMatches) {
+      const matchData = match.id === completedMatchId 
+        ? { ...match, status: "completed", player1_score: scores[completedMatchId]?.p1, player2_score: scores[completedMatchId]?.p2 }
+        : match;
+
+      if ((matchData.player1_score ?? 0) > (matchData.player2_score ?? 0) && matchData.player1) {
+        winners.push(matchData.player1);
+      } else if ((matchData.player2_score ?? 0) > (matchData.player1_score ?? 0) && matchData.player2) {
+        winners.push(matchData.player2);
+      }
+    }
+
+    // Only create next round if we have 2 or more winners
+    if (winners.length < 2) return;
+
+    // Check if next round already exists
+    const nextRound = currentRound + 1;
+    const { data: existingNextRound } = await supabase
+      .from("matches")
+      .select("id")
+      .eq("tournament_id", tournamentId)
+      .eq("round", nextRound);
+
+    if (existingNextRound && existingNextRound.length > 0) return;
+
+    // Create next round matches
+    const nextRoundMatches = [];
+    for (let i = 0; i < winners.length; i += 2) {
+      if (i + 1 < winners.length) {
+        nextRoundMatches.push({
+          tournament_id: tournamentId,
+          round: nextRound,
+          player1_id: winners[i].id,
+          player2_id: winners[i + 1].id,
+          status: "pending",
+        });
+      }
+    }
+
+    if (nextRoundMatches.length > 0) {
+      const { error } = await supabase
+        .from("matches")
+        .insert(nextRoundMatches);
+
+      if (error) {
+        console.error("Failed to create next round:", error);
+      } else {
+        toast.success(`Round ${nextRound} has been created!`);
+      }
+    }
   };
 
   const groupedMatches = matches.reduce((acc, match) => {
