@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, Medal, Award } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Medal, Award, Edit } from "lucide-react";
+import { EditMatchParticipants } from "./EditMatchParticipants";
 
 interface Match {
   id: string;
   player1?: { id: string; name: string };
   player2?: { id: string; name: string };
+  player1_id?: string;
+  player2_id?: string;
   player1_score?: number;
   player2_score?: number;
   status: string;
@@ -13,9 +18,12 @@ interface Match {
 
 interface EliminatoryBracketProps {
   matches: Match[];
+  tournamentId: string;
 }
 
-export const EliminatoryBracket = ({ matches }: EliminatoryBracketProps) => {
+export const EliminatoryBracket = ({ matches, tournamentId }: EliminatoryBracketProps) => {
+  const [editingMatch, setEditingMatch] = useState<{ id: string; player1Id?: string; player2Id?: string } | null>(null);
+
   // Filter out matches where both players are null/undefined (TBD matches that shouldn't display yet)
   const validMatches = matches.filter(match => match.player1 || match.player2);
   
@@ -91,6 +99,21 @@ export const EliminatoryBracket = ({ matches }: EliminatoryBracketProps) => {
                       >
                         <Card className={isFinal && winner ? "border-primary shadow-lg" : ""}>
                           <CardContent className="p-4 space-y-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-muted-foreground">Match {matchIndex + 1}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setEditingMatch({ 
+                                  id: match.id, 
+                                  player1Id: match.player1_id, 
+                                  player2Id: match.player2_id 
+                                })}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            </div>
                             <div className={`flex items-center justify-between p-2 rounded ${
                               isPlayer1Winner ? 'bg-primary/10 border border-primary' : 'bg-muted/50'
                             }`}>
@@ -194,6 +217,17 @@ export const EliminatoryBracket = ({ matches }: EliminatoryBracketProps) => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {editingMatch && (
+        <EditMatchParticipants
+          open={!!editingMatch}
+          onOpenChange={(open) => !open && setEditingMatch(null)}
+          matchId={editingMatch.id}
+          currentPlayer1Id={editingMatch.player1Id}
+          currentPlayer2Id={editingMatch.player2Id}
+          tournamentId={tournamentId}
+        />
       )}
     </div>
   );

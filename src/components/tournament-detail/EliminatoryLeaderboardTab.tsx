@@ -57,5 +57,5 @@ export const EliminatoryLeaderboardTab = ({ tournamentId }: EliminatoryLeaderboa
     }
   };
 
-  return <EliminatoryBracket matches={matches} />;
+  return <EliminatoryBracket matches={matches} tournamentId={tournamentId} />;
 };
