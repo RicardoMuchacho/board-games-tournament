@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Trophy } from "lucide-react";
 import { TournamentList } from "@/components/tournaments/TournamentList";
 import { CreateTournamentDialog } from "@/components/tournaments/CreateTournamentDialog";
-import { AllParticipantsList } from "@/components/dashboard/AllParticipantsList";
+
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -57,6 +57,10 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button onClick={() => navigate("/leaderboard")} variant="outline" className="gap-2">
+              <Trophy className="h-4 w-4" />
+              Leaderboard
+            </Button>
             <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
               <Plus className="h-4 w-4" />
               New Tournament
@@ -69,7 +73,6 @@ const Dashboard = () => {
         </header>
 
         <div className="space-y-6">
-          <AllParticipantsList />
           <TournamentList />
         </div>
       </div>

@@ -9,7 +9,8 @@ interface Participant {
   id: string;
   name: string;
   tournament_count: number;
-  total_wins: number;
+  match_wins: number;
+  tournament_wins: number;
   total_victory_points: number;
   total_tournament_points: number;
 }
@@ -82,7 +83,7 @@ export function AllParticipantsList() {
 
       const { data: matchParticipants, error: mpError } = await supabase
         .from('match_participants')
-        .select('participant_id, victory_points, tournament_points')
+        .select('participant_id, victory_points, tournament_points, placement')
         .in('participant_id', participantIds);
 
       if (matchesError) throw matchesError;
@@ -96,7 +97,8 @@ export function AllParticipantsList() {
       const participantMap = new Map<string, {
         id: string;
         tournament_count: number;
-        total_wins: number;
+        match_wins: number;
+        tournament_wins: number;
         total_victory_points: number;
         total_tournament_points: number;
       }>();
@@ -106,7 +108,8 @@ export function AllParticipantsList() {
           participantMap.set(p.name, {
             id: p.id,
             tournament_count: 0,
-            total_wins: 0,
+            match_wins: 0,
+            tournament_wins: 0,
             total_victory_points: 0,
             total_tournament_points: 0,
           });
@@ -114,12 +117,18 @@ export function AllParticipantsList() {
         const stats = participantMap.get(p.name)!;
         stats.tournament_count++;
 
-        // Count wins from regular matches
-        const wins = allMatches?.filter(m => 
+        // Count match wins from regular matches
+        const matchWins = allMatches?.filter(m => 
           (m.player1_id === p.id && m.player1_score > m.player2_score) ||
           (m.player2_id === p.id && m.player2_score > m.player1_score)
         ).length || 0;
-        stats.total_wins += wins;
+        stats.match_wins += matchWins;
+        
+        // Count tournament wins (1st place finishes in Catan matches)
+        const tournamentWins = matchParticipants
+          ?.filter(mp => mp.participant_id === p.id && mp.placement === 1)
+          .length || 0;
+        stats.tournament_wins += tournamentWins;
 
         // Sum victory points and tournament points from Catan matches
         const vpSum = matchParticipants
@@ -139,14 +148,19 @@ export function AllParticipantsList() {
           id: stats.id,
           name,
           tournament_count: stats.tournament_count,
-          total_wins: stats.total_wins,
+          match_wins: stats.match_wins,
+          tournament_wins: stats.tournament_wins,
           total_victory_points: stats.total_victory_points,
           total_tournament_points: stats.total_tournament_points,
         })
       );
 
-      // Sort by total wins descending
-      uniqueParticipants.sort((a, b) => b.total_wins - a.total_wins || b.total_tournament_points - a.total_tournament_points);
+      // Sort by match wins, then tournament wins, then tournament points
+      uniqueParticipants.sort((a, b) => 
+        b.match_wins - a.match_wins || 
+        b.tournament_wins - a.tournament_wins || 
+        b.total_tournament_points - a.total_tournament_points
+      );
       setParticipants(uniqueParticipants);
     } catch (error) {
       console.error('Error fetching participants:', error);
@@ -196,7 +210,8 @@ export function AllParticipantsList() {
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Participant</TableHead>
                 <TableHead className="text-center">Tournaments</TableHead>
-                <TableHead className="text-center">Wins</TableHead>
+                <TableHead className="text-center">Match Wins</TableHead>
+                <TableHead className="text-center">Tournament Wins</TableHead>
                 <TableHead className="text-center">Victory Points</TableHead>
                 <TableHead className="text-center">Tournament Points</TableHead>
               </TableRow>
@@ -213,7 +228,8 @@ export function AllParticipantsList() {
                   </TableCell>
                   <TableCell className="font-medium">{participant.name}</TableCell>
                   <TableCell className="text-center">{participant.tournament_count}</TableCell>
-                  <TableCell className="text-center font-semibold">{participant.total_wins}</TableCell>
+                  <TableCell className="text-center font-semibold">{participant.match_wins}</TableCell>
+                  <TableCell className="text-center font-semibold">{participant.tournament_wins}</TableCell>
                   <TableCell className="text-center">{participant.total_victory_points}</TableCell>
                   <TableCell className="text-center">{participant.total_tournament_points}</TableCell>
                 </TableRow>
