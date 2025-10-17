@@ -180,6 +180,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          match_generation_mode: string | null
           name: string
           number_of_participants: number | null
           number_of_rounds: number | null
@@ -191,6 +192,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          match_generation_mode?: string | null
           name: string
           number_of_participants?: number | null
           number_of_rounds?: number | null
@@ -202,6 +204,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          match_generation_mode?: string | null
           name?: string
           number_of_participants?: number | null
           number_of_rounds?: number | null

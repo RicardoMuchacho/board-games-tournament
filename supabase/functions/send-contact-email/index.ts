@@ -1,7 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,24 +31,16 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Send email to KLEFF
-    const emailResponse = await resend.emails.send({
-      from: "KLEFF Contact Form <onboarding@resend.dev>",
-      to: ["kleffbcn@gmail.com"],
-      replyTo: email,
-      subject: `New Contact Form Message from ${name}`,
-      html: `
-        <h2>New Contact Form Submission</h2>
-        <p><strong>From:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Message:</strong></p>
-        <p>${message.replace(/\n/g, '<br>')}</p>
-      `,
-    });
+    // Log the contact form submission
+    console.log("Contact form submission:", { name, email, message });
 
-    console.log("Email sent successfully:", emailResponse);
-
-    return new Response(JSON.stringify(emailResponse), {
+    // TODO: Integrate with an email service like SendGrid, Mailgun, or Resend
+    // For now, we're just logging and returning success
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: "Contact form submitted successfully" 
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

@@ -14,6 +14,7 @@ const tournamentSchema = z.object({
   type: z.enum(["swiss", "eliminatory", "round_robin", "catan"]),
   number_of_participants: z.number().min(2).max(100).optional(),
   number_of_rounds: z.number().min(1).max(50).optional(),
+  match_generation_mode: z.enum(["auto", "manual"]),
 });
 
 interface CreateTournamentDialogProps {
@@ -27,6 +28,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
   const [type, setType] = useState<"swiss" | "eliminatory" | "round_robin" | "catan">("swiss");
   const [numberOfParticipants, setNumberOfParticipants] = useState<number | undefined>(undefined);
   const [numberOfRounds, setNumberOfRounds] = useState<number | undefined>(undefined);
+  const [matchGenerationMode, setMatchGenerationMode] = useState<"auto" | "manual">("auto");
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +47,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
         type,
         number_of_participants: numberOfParticipants,
         number_of_rounds: finalNumberOfRounds,
+        match_generation_mode: matchGenerationMode,
       });
       if (!validation.success) {
         toast.error(validation.error.errors[0].message);
@@ -69,6 +72,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
           created_by: user.id,
           number_of_participants: validation.data.number_of_participants,
           number_of_rounds: finalNumberOfRounds,
+          match_generation_mode: validation.data.match_generation_mode,
         },
       ]);
 
@@ -80,6 +84,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
       setType("swiss");
       setNumberOfParticipants(undefined);
       setNumberOfRounds(undefined);
+      setMatchGenerationMode("auto");
     } catch (error: any) {
       toast.error(error.message || "Failed to create tournament");
     } finally {
@@ -115,6 +120,18 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
                 <SelectItem value="eliminatory">Eliminatory (Bracket)</SelectItem>
                 <SelectItem value="round_robin">Round Robin</SelectItem>
                 <SelectItem value="catan">Catan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="matchMode">Match Generation Mode</Label>
+            <Select value={matchGenerationMode} onValueChange={(value: any) => setMatchGenerationMode(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto-generate matches</SelectItem>
+                <SelectItem value="manual">Manual assignment</SelectItem>
               </SelectContent>
             </Select>
           </div>
