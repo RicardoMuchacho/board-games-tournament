@@ -32,9 +32,10 @@ interface ParticipantsTabProps {
   tournamentType: string;
   maxParticipants?: number;
   numberOfRounds?: number;
+  matchGenerationMode?: string;
 }
 
-export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds }: ParticipantsTabProps) => {
+export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds, matchGenerationMode }: ParticipantsTabProps) => {
   const navigate = useNavigate();
   const [participants, setParticipants] = useState<any[]>([]);
   const [existingNames, setExistingNames] = useState<string[]>([]);
@@ -146,14 +147,18 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
   };
 
   const generateMatches = async () => {
-    if (tournamentType === "catan") {
-      if (participants.length < 3) {
-        toast.error("Catan needs at least 3 participants");
+    const isManualMode = matchGenerationMode === "manual";
+    
+    if (!isManualMode) {
+      if (tournamentType === "catan") {
+        if (participants.length < 3) {
+          toast.error("Catan needs at least 3 participants");
+          return;
+        }
+      } else if (participants.length < 2) {
+        toast.error("Need at least 2 participants");
         return;
       }
-    } else if (participants.length < 2) {
-      toast.error("Need at least 2 participants");
-      return;
     }
 
     setLoading(true);
@@ -165,7 +170,31 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
       const matchParticipants: any[] = [];
       const rounds = numberOfRounds || 1;
 
-      if (tournamentType === "catan") {
+      if (isManualMode) {
+        // Manual mode: Create blank matches without participants
+        const matchesPerRound = tournamentType === "catan" ? 
+          Math.ceil(participants.length / 4) : 
+          Math.ceil(participants.length / 2);
+        
+        for (let round = 1; round <= rounds; round++) {
+          for (let i = 0; i < matchesPerRound; i++) {
+            matches.push({
+              tournament_id: tournamentId,
+              round: round,
+              player1_id: null,
+              player2_id: null,
+              player3_id: tournamentType === "catan" ? null : undefined,
+              player4_id: tournamentType === "catan" ? null : undefined,
+              status: "pending",
+            });
+          }
+        }
+
+        const { error } = await supabase.from("matches").insert(matches);
+        if (error) throw error;
+
+        toast.success(`Generated ${matches.length} blank matches for manual assignment`);
+      } else if (tournamentType === "catan") {
         // Generate Catan pairings with no repeats
         const allRoundMatches = generateCatanPairings(participants, rounds);
         
@@ -387,7 +416,11 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
         <h3 className="text-lg font-semibold">
           {participants.length} {maxParticipants ? `/ ${maxParticipants}` : ""} Participants
         </h3>
-        <Button onClick={generateMatches} disabled={loading || participants.length < 2} className="gap-2">
+        <Button 
+          onClick={generateMatches} 
+          disabled={loading || (matchGenerationMode !== "manual" && participants.length < 2)} 
+          className="gap-2"
+        >
           <Shuffle className="h-4 w-4" />
           Generate Matches
         </Button>

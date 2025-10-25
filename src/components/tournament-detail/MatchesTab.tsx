@@ -352,6 +352,7 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
           currentPlayer1Id={editingMatch.player1Id}
           currentPlayer2Id={editingMatch.player2Id}
           tournamentId={tournamentId}
+          roundNumber={selectedRound}
         />
       )}
     </div>

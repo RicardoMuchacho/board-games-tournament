@@ -13,6 +13,7 @@ interface EditCatanMatchParticipantsProps {
   matchId: string;
   currentParticipantIds: string[];
   tournamentId: string;
+  roundNumber?: number;
 }
 
 export const EditCatanMatchParticipants = ({
@@ -21,6 +22,7 @@ export const EditCatanMatchParticipants = ({
   matchId,
   currentParticipantIds,
   tournamentId,
+  roundNumber,
 }: EditCatanMatchParticipantsProps) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(currentParticipantIds);
@@ -74,6 +76,41 @@ export const EditCatanMatchParticipants = ({
 
     setLoading(true);
     try {
+      // Check if participants are already in other matches in the same round
+      if (roundNumber) {
+        const { data: roundMatches } = await supabase
+          .from("matches")
+          .select("id")
+          .eq("tournament_id", tournamentId)
+          .eq("round", roundNumber)
+          .neq("id", matchId);
+
+        if (roundMatches && roundMatches.length > 0) {
+          // @ts-ignore
+          const { data: existingParticipants } = await (supabase as any)
+            .from("match_participants")
+            .select("participant_id, participants(name)")
+            .in("match_id", roundMatches.map((m: any) => m.id));
+
+          if (existingParticipants) {
+            const usedParticipantIds = new Set(existingParticipants.map((mp: any) => mp.participant_id));
+            const duplicates = selectedIds.filter(id => usedParticipantIds.has(id));
+            
+            if (duplicates.length > 0) {
+              const duplicateNames = duplicates
+                .map(id => {
+                  const ep = existingParticipants.find((p: any) => p.participant_id === id);
+                  return ep?.participants?.name || 'Unknown';
+                })
+                .join(", ");
+              toast.error(`${duplicateNames} already in another match this round`);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      }
+
       // Delete existing match participants
       // @ts-ignore
       await (supabase as any)

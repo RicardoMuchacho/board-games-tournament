@@ -339,6 +339,7 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
           matchId={editingMatch.id}
           currentParticipantIds={editingMatch.participantIds}
           tournamentId={tournamentId}
+          roundNumber={selectedRound}
         />
       )}
     </div>

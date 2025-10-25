@@ -14,6 +14,7 @@ interface EditMatchParticipantsProps {
   currentPlayer1Id?: string | null;
   currentPlayer2Id?: string | null;
   tournamentId: string;
+  roundNumber?: number;
 }
 
 export const EditMatchParticipants = ({
@@ -23,6 +24,7 @@ export const EditMatchParticipants = ({
   currentPlayer1Id,
   currentPlayer2Id,
   tournamentId,
+  roundNumber,
 }: EditMatchParticipantsProps) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [player1Id, setPlayer1Id] = useState<string | undefined>(currentPlayer1Id || undefined);
@@ -64,6 +66,37 @@ export const EditMatchParticipants = ({
 
     setLoading(true);
     try {
+      // Check if participants are already in other matches in the same round
+      if (roundNumber) {
+        const { data: roundMatches } = await supabase
+          .from("matches")
+          .select("id, player1_id, player2_id")
+          .eq("tournament_id", tournamentId)
+          .eq("round", roundNumber)
+          .neq("id", matchId);
+
+        if (roundMatches) {
+          const usedParticipants = new Set<string>();
+          roundMatches.forEach(m => {
+            if (m.player1_id) usedParticipants.add(m.player1_id);
+            if (m.player2_id) usedParticipants.add(m.player2_id);
+          });
+
+          if (usedParticipants.has(player1Id)) {
+            const participant = participants.find(p => p.id === player1Id);
+            toast.error(`${participant?.name || 'Player 1'} is already in another match this round`);
+            setLoading(false);
+            return;
+          }
+          if (usedParticipants.has(player2Id)) {
+            const participant = participants.find(p => p.id === player2Id);
+            toast.error(`${participant?.name || 'Player 2'} is already in another match this round`);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const { error } = await supabase
         .from("matches")
         .update({
