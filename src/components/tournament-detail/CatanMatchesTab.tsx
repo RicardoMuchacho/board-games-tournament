@@ -147,16 +147,17 @@ export const CatanMatchesTab = ({ tournamentId }: CatanMatchesTabProps) => {
 
   const currentRoundMatches = groupedMatches[selectedRound] || [];
 
+  // Keep table numbers stable based on original creation order
+  const getTableNumber = (match: any) => {
+    return currentRoundMatches.findIndex(m => m.id === match.id) + 1;
+  };
+
   const filteredMatches = currentRoundMatches.filter((match) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     const participants = matchParticipants[match.id] || [];
     return participants.some(p => p.participant?.name?.toLowerCase().includes(query));
   });
-
-  const getTableNumber = (match: any) => {
-    return currentRoundMatches.findIndex(m => m.id === match.id) + 1;
-  };
 
   const getTournamentPoints = (placement: number): number => {
     const points: { [key: number]: number } = {
