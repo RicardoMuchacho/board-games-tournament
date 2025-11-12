@@ -339,7 +339,7 @@ export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) =>
                     </div>
                     {tournamentType === "swiss" && match.status !== "completed" && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Winner</label>
+                        <label className="text-sm font-medium">Select Winner</label>
                         <div className="flex gap-2">
                           <Button
                             variant={winners[match.id] === match.player1_id ? "default" : "outline"}
@@ -360,8 +360,12 @@ export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) =>
                         </div>
                       </div>
                     )}
-                    {match.status !== "completed" && scores[match.id] && (
-                      <Button onClick={() => updateScore(match.id)} className="w-full">
+                    {match.status !== "completed" && (
+                      <Button 
+                        onClick={() => updateScore(match.id)} 
+                        className="w-full"
+                        disabled={tournamentType === "swiss" && (!scores[match.id] || !winners[match.id])}
+                      >
                         Save Score
                       </Button>
                     )}
