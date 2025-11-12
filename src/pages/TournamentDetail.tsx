@@ -82,13 +82,14 @@ const TournamentDetail = () => {
               maxParticipants={tournament.number_of_participants}
               numberOfRounds={tournament.number_of_rounds}
               matchGenerationMode={tournament.match_generation_mode}
+              playersPerMatch={tournament.players_per_match}
             />
           </TabsContent>
           <TabsContent value="matches" className="mt-6">
             {tournament.type === "catan" ? (
               <CatanMatchesTab tournamentId={id!} />
             ) : (
-              <MatchesTab tournamentId={id!} />
+              <MatchesTab tournamentId={id!} tournamentType={tournament.type} />
             )}
           </TabsContent>
           <TabsContent value="leaderboard" className="mt-6">

@@ -75,6 +75,7 @@ export type Database = {
           status: Database["public"]["Enums"]["match_status"] | null
           tournament_id: string | null
           updated_at: string | null
+          winner_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -91,6 +92,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["match_status"] | null
           tournament_id?: string | null
           updated_at?: string | null
+          winner_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -107,6 +109,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["match_status"] | null
           tournament_id?: string | null
           updated_at?: string | null
+          winner_id?: string | null
         }
         Relationships: [
           {
@@ -142,6 +145,13 @@ export type Database = {
             columns: ["tournament_id"]
             isOneToOne: false
             referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
             referencedColumns: ["id"]
           },
         ]
@@ -184,6 +194,7 @@ export type Database = {
           name: string
           number_of_participants: number | null
           number_of_rounds: number | null
+          players_per_match: number | null
           status: string | null
           type: Database["public"]["Enums"]["tournament_type"]
           updated_at: string | null
@@ -196,6 +207,7 @@ export type Database = {
           name: string
           number_of_participants?: number | null
           number_of_rounds?: number | null
+          players_per_match?: number | null
           status?: string | null
           type: Database["public"]["Enums"]["tournament_type"]
           updated_at?: string | null
@@ -208,6 +220,7 @@ export type Database = {
           name?: string
           number_of_participants?: number | null
           number_of_rounds?: number | null
+          players_per_match?: number | null
           status?: string | null
           type?: Database["public"]["Enums"]["tournament_type"]
           updated_at?: string | null
@@ -250,6 +263,20 @@ export type Database = {
           total_tournament_points: number
           total_victory_points: number
           tournament_id: string
+        }[]
+      }
+      get_swiss_tournament_standings: {
+        Args: { tournament_id_input: string }
+        Returns: {
+          draws: number
+          id: string
+          losses: number
+          matches_played: number
+          name: string
+          opponent_strength: number
+          total_score: number
+          tournament_id: string
+          wins: number
         }[]
       }
       get_tournament_standings: {

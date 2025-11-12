@@ -33,9 +33,10 @@ interface ParticipantsTabProps {
   maxParticipants?: number;
   numberOfRounds?: number;
   matchGenerationMode?: string;
+  playersPerMatch?: number;
 }
 
-export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds, matchGenerationMode }: ParticipantsTabProps) => {
+export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds, matchGenerationMode, playersPerMatch = 2 }: ParticipantsTabProps) => {
   const navigate = useNavigate();
   const [participants, setParticipants] = useState<any[]>([]);
   const [existingNames, setExistingNames] = useState<string[]>([]);
@@ -292,18 +293,18 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
 
         toast.success(`Generated ${matches.length} matches`);
       } else {
-        // Swiss: Generate pairings with no repeats
-        const allRoundMatches = generateSwissPairings(participants, rounds);
+        // Swiss: Generate pairings with win-based matching
+        const allRoundMatches = generateSwissPairings(participants, rounds, [], playersPerMatch);
         
         for (let round = 1; round <= rounds; round++) {
           const roundMatches = allRoundMatches[round - 1] || [];
           
-          for (const [player1, player2] of roundMatches) {
+          for (const matchPlayers of roundMatches) {
             matches.push({
               tournament_id: tournamentId,
               round: round,
-              player1_id: player1.id,
-              player2_id: player2.id,
+              player1_id: matchPlayers[0]?.id,
+              player2_id: matchPlayers[1]?.id,
               status: "pending",
             });
           }

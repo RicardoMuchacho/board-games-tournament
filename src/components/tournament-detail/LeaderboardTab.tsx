@@ -59,6 +59,17 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
         return;
       }
       setStandings(data || []);
+    } else if (tournamentType === "swiss") {
+      // @ts-ignore - RPC function type not yet updated in generated types
+      const { data, error } = await supabase.rpc("get_swiss_tournament_standings", {
+        tournament_id_input: tournamentId,
+      });
+
+      if (error) {
+        toast.error("Failed to load standings");
+        return;
+      }
+      setStandings(data || []);
     } else {
       // @ts-ignore - RPC function type not yet updated in generated types
       const { data, error } = await supabase.rpc("get_tournament_standings", {
@@ -141,6 +152,9 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
                 <TableHead className="text-center">Losses</TableHead>
                 <TableHead className="text-center">Draws</TableHead>
                 <TableHead className="text-center">Points</TableHead>
+                {tournamentType === "swiss" && (
+                  <TableHead className="text-center">Opp. Strength</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,6 +176,9 @@ export const LeaderboardTab = ({ tournamentId, tournamentType }: LeaderboardTabP
                   <TableCell className="text-center text-destructive">{standing.losses || 0}</TableCell>
                   <TableCell className="text-center">{standing.draws || 0}</TableCell>
                   <TableCell className="text-center font-bold">{standing.total_score || 0}</TableCell>
+                  {tournamentType === "swiss" && (
+                    <TableCell className="text-center text-muted-foreground">{standing.opponent_strength || 0}</TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

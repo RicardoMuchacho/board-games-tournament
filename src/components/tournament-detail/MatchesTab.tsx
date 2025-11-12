@@ -10,11 +10,13 @@ import { EditMatchParticipants } from "./EditMatchParticipants";
 
 interface MatchesTabProps {
   tournamentId: string;
+  tournamentType?: string;
 }
 
-export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
+export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [scores, setScores] = useState<{ [key: string]: { p1: number; p2: number } }>({});
+  const [winners, setWinners] = useState<{ [key: string]: string | null }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMatch, setEditingMatch] = useState<{ id: string; player1Id?: string; player2Id?: string } | null>(null);
@@ -73,11 +75,18 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
       return;
     }
 
+    // For Swiss, require winner selection
+    if (tournamentType === "swiss" && !winners[matchId]) {
+      toast.error("Please select a winner");
+      return;
+    }
+
     const { error } = await supabase
       .from("matches")
       .update({
         player1_score: score.p1,
         player2_score: score.p2,
+        winner_id: tournamentType === "swiss" ? winners[matchId] : null,
         status: "completed",
       })
       .eq("id", matchId);
@@ -92,6 +101,11 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
       const newScores = { ...prev };
       delete newScores[matchId];
       return newScores;
+    });
+    setWinners((prev) => {
+      const newWinners = { ...prev };
+      delete newWinners[matchId];
+      return newWinners;
     });
 
     // Check if we need to generate next round for eliminatory tournament
@@ -323,6 +337,29 @@ export const MatchesTab = ({ tournamentId }: MatchesTabProps) => {
                         disabled={match.status === "completed"}
                       />
                     </div>
+                    {tournamentType === "swiss" && match.status !== "completed" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Winner</label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant={winners[match.id] === match.player1_id ? "default" : "outline"}
+                            onClick={() => setWinners((prev) => ({ ...prev, [match.id]: match.player1_id }))}
+                            className="flex-1"
+                            disabled={!match.player1_id}
+                          >
+                            {match.player1?.name || "P1"}
+                          </Button>
+                          <Button
+                            variant={winners[match.id] === match.player2_id ? "default" : "outline"}
+                            onClick={() => setWinners((prev) => ({ ...prev, [match.id]: match.player2_id }))}
+                            className="flex-1"
+                            disabled={!match.player2_id}
+                          >
+                            {match.player2?.name || "P2"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {match.status !== "completed" && scores[match.id] && (
                       <Button onClick={() => updateScore(match.id)} className="w-full">
                         Save Score

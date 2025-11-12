@@ -15,6 +15,7 @@ const tournamentSchema = z.object({
   number_of_participants: z.number().min(2).max(100).optional(),
   number_of_rounds: z.number().min(1).max(50).optional(),
   match_generation_mode: z.enum(["auto", "manual"]),
+  players_per_match: z.number().min(2).max(10).optional(),
 });
 
 interface CreateTournamentDialogProps {
@@ -29,6 +30,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
   const [numberOfParticipants, setNumberOfParticipants] = useState<number | undefined>(undefined);
   const [numberOfRounds, setNumberOfRounds] = useState<number | undefined>(undefined);
   const [matchGenerationMode, setMatchGenerationMode] = useState<"auto" | "manual">("auto");
+  const [playersPerMatch, setPlayersPerMatch] = useState<number>(2);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +50,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
         number_of_participants: numberOfParticipants,
         number_of_rounds: finalNumberOfRounds,
         match_generation_mode: matchGenerationMode,
+        players_per_match: type === "swiss" ? playersPerMatch : undefined,
       });
       if (!validation.success) {
         toast.error(validation.error.errors[0].message);
@@ -73,6 +76,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
           number_of_participants: validation.data.number_of_participants,
           number_of_rounds: finalNumberOfRounds,
           match_generation_mode: validation.data.match_generation_mode,
+          players_per_match: validation.data.players_per_match || 2,
         },
       ]);
 
@@ -85,6 +89,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
       setNumberOfParticipants(undefined);
       setNumberOfRounds(undefined);
       setMatchGenerationMode("auto");
+      setPlayersPerMatch(2);
     } catch (error: any) {
       toast.error(error.message || "Failed to create tournament");
     } finally {
@@ -135,6 +140,19 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
               </SelectContent>
             </Select>
           </div>
+          {type === "swiss" && (
+            <div className="space-y-2">
+              <Label htmlFor="playersPerMatch">Players Per Match</Label>
+              <Input
+                id="playersPerMatch"
+                type="number"
+                min="2"
+                max="10"
+                value={playersPerMatch}
+                onChange={(e) => setPlayersPerMatch(parseInt(e.target.value) || 2)}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="participants">Number of Participants (Optional)</Label>
             <Input

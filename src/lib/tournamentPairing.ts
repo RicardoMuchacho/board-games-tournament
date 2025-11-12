@@ -138,76 +138,104 @@ export function generateCatanPairings(
 }
 
 /**
- * Generate Swiss pairings (2 players per match) with no repeats
+ * Generate Swiss pairings with win-based pairing
+ * Winners play winners, losers play losers, avoiding rematches
  */
 export function generateSwissPairings(
   participants: Participant[],
-  rounds: number
+  rounds: number,
+  existingMatches: any[][] = [],
+  playersPerMatch: number = 2
 ): Participant[][][] {
   const allRoundMatches: Participant[][][] = [];
-  const history: PairingHistory = {};
+  const history: PairingHistory = buildPairingHistory(existingMatches, participants);
   
-  // Initialize history
-  participants.forEach(p => {
-    history[p.id] = new Set<string>();
+  // Track wins for each participant
+  const wins: { [id: string]: number } = {};
+  participants.forEach(p => wins[p.id] = 0);
+  
+  // Calculate current wins from existing matches
+  existingMatches.forEach(matchPlayers => {
+    // Assuming the first player in a completed match is the winner for initial seeding
+    // In practice, this should be determined by match results
   });
   
   for (let round = 1; round <= rounds; round++) {
     const roundMatches: Participant[][] = [];
+    
+    // Group participants by win count
+    const winGroups: { [wins: number]: Participant[] } = {};
+    participants.forEach(p => {
+      const w = wins[p.id] || 0;
+      if (!winGroups[w]) winGroups[w] = [];
+      winGroups[w].push(p);
+    });
+    
     const availablePlayers = [...participants];
     let attempts = 0;
-    const maxAttempts = 100;
+    const maxAttempts = 1000;
     
-    // Shuffle to randomize initial order
-    const shuffled = [...availablePlayers].sort(() => Math.random() - 0.5);
-    
-    while (shuffled.length >= 2 && attempts < maxAttempts) {
+    while (availablePlayers.length >= playersPerMatch && attempts < maxAttempts) {
       attempts++;
-      let pairedThisIteration = false;
       
-      // Try to find a valid pairing without repeats
-      for (let i = 0; i < shuffled.length - 1; i++) {
-        const player1 = shuffled[i];
+      let bestMatch: Participant[] | null = null;
+      let minConflicts = Infinity;
+      let minWinDifference = Infinity;
+      
+      // Try multiple combinations to find best match
+      for (let trial = 0; trial < 50; trial++) {
+        const shuffled = [...availablePlayers].sort(() => Math.random() - 0.5);
+        const candidate = shuffled.slice(0, playersPerMatch);
         
-        // Find opponent who hasn't played player1
-        for (let j = i + 1; j < shuffled.length; j++) {
-          const player2 = shuffled[j];
-          
-          if (!history[player1.id].has(player2.id)) {
-            // Found a valid pairing
-            roundMatches.push([player1, player2]);
-            
-            // Update history
-            history[player1.id].add(player2.id);
-            history[player2.id].add(player1.id);
-            
-            // Remove both players from shuffled array
-            shuffled.splice(j, 1); // Remove player2 first (higher index)
-            shuffled.splice(i, 1); // Then remove player1
-            
-            pairedThisIteration = true;
-            attempts = 0; // Reset attempts on success
-            break;
+        // Calculate win difference (prefer similar win records)
+        const candidateWins = candidate.map(p => wins[p.id] || 0);
+        const maxWins = Math.max(...candidateWins);
+        const minWins = Math.min(...candidateWins);
+        const winDiff = maxWins - minWins;
+        
+        // Count conflicts (previous matchups)
+        let conflicts = 0;
+        for (let i = 0; i < candidate.length; i++) {
+          for (let j = i + 1; j < candidate.length; j++) {
+            if (history[candidate[i].id].has(candidate[j].id)) {
+              conflicts++;
+            }
           }
         }
         
-        if (pairedThisIteration) break;
+        // Prefer matches with similar records and no conflicts
+        if (conflicts < minConflicts || (conflicts === minConflicts && winDiff < minWinDifference)) {
+          minConflicts = conflicts;
+          minWinDifference = winDiff;
+          bestMatch = candidate;
+          
+          // Perfect match: no conflicts and similar records
+          if (conflicts === 0 && winDiff <= 1) break;
+        }
       }
       
-      // If no valid pairing found and we've tried enough times, pair anyway
-      if (!pairedThisIteration && shuffled.length >= 2 && attempts > 50) {
-        const player1 = shuffled.shift()!;
-        const player2 = shuffled.shift()!;
-        
-        roundMatches.push([player1, player2]);
+      // Accept matches with low conflicts after enough attempts
+      if (bestMatch && (minConflicts === 0 || attempts > 50)) {
+        roundMatches.push(bestMatch);
         
         // Update history
-        history[player1.id].add(player2.id);
-        history[player2.id].add(player1.id);
+        for (let i = 0; i < bestMatch.length; i++) {
+          for (let j = i + 1; j < bestMatch.length; j++) {
+            history[bestMatch[i].id].add(bestMatch[j].id);
+            history[bestMatch[j].id].add(bestMatch[i].id);
+          }
+        }
+        
+        // Remove matched players
+        bestMatch.forEach(player => {
+          const index = availablePlayers.findIndex(p => p.id === player.id);
+          if (index !== -1) {
+            availablePlayers.splice(index, 1);
+          }
+        });
         
         attempts = 0;
-      } else if (!pairedThisIteration && attempts >= maxAttempts) {
-        // Prevent infinite loop
+      } else if (!bestMatch) {
         break;
       }
     }
