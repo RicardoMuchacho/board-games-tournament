@@ -172,29 +172,117 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
       const rounds = numberOfRounds || 1;
 
       if (isManualMode) {
-        // Manual mode: Create blank matches without participants
-        const matchesPerRound = tournamentType === "catan" ? 
-          Math.ceil(participants.length / 4) : 
-          Math.ceil(participants.length / 2);
-        
-        for (let round = 1; round <= rounds; round++) {
-          for (let i = 0; i < matchesPerRound; i++) {
-            matches.push({
-              tournament_id: tournamentId,
-              round: round,
-              player1_id: null,
-              player2_id: null,
-              player3_id: tournamentType === "catan" ? null : undefined,
-              player4_id: tournamentType === "catan" ? null : undefined,
-              status: "pending",
+        if (tournamentType === "catan") {
+          // Manual mode for Catan: Generate smart pairings that avoid previous matchups
+          // First, fetch existing matches to build history
+          const { data: existingMatchesData } = await supabase
+            .from("matches")
+            .select("id, round")
+            .eq("tournament_id", tournamentId);
+
+          // Fetch existing match participants to build pairing history
+          const existingMatchIds = existingMatchesData?.map(m => m.id) || [];
+          let existingPairings: any[][] = [];
+          
+          if (existingMatchIds.length > 0) {
+            // @ts-ignore
+            const { data: mpData } = await (supabase as any)
+              .from("match_participants")
+              .select("match_id, participant_id")
+              .in("match_id", existingMatchIds);
+
+            // Group by match
+            const matchGroups: { [key: string]: string[] } = {};
+            mpData?.forEach((mp: any) => {
+              if (!matchGroups[mp.match_id]) matchGroups[mp.match_id] = [];
+              matchGroups[mp.match_id].push(mp.participant_id);
             });
+
+            // Convert to participant objects for the pairing algorithm
+            existingPairings = Object.values(matchGroups).map(participantIds =>
+              participantIds.map(id => participants.find(p => p.id === id)).filter(Boolean)
+            );
           }
+
+          // Generate smart pairings using the existing algorithm
+          const allRoundMatches = generateCatanPairings(participants, rounds);
+          
+          for (let round = 1; round <= rounds; round++) {
+            const roundMatches = allRoundMatches[round - 1] || [];
+            
+            for (const matchPlayers of roundMatches) {
+              matches.push({
+                tournament_id: tournamentId,
+                round: round,
+                player1_id: matchPlayers[0]?.id,
+                player2_id: matchPlayers[1]?.id,
+                player3_id: matchPlayers[2]?.id,
+                player4_id: matchPlayers[3]?.id || null,
+                status: "pending",
+              });
+            }
+          }
+
+          // Insert matches first
+          const { data: insertedMatches, error: matchError } = await supabase
+            .from("matches")
+            .insert(matches)
+            .select();
+          
+          if (matchError) throw matchError;
+
+          // Create match_participants
+          if (insertedMatches) {
+            let matchIndex = 0;
+            for (let round = 1; round <= rounds; round++) {
+              const roundMatches = allRoundMatches[round - 1] || [];
+              
+              for (const matchPlayers of roundMatches) {
+                const match = insertedMatches[matchIndex++];
+                
+                for (const player of matchPlayers) {
+                  matchParticipants.push({
+                    match_id: match.id,
+                    participant_id: player.id,
+                    victory_points: 0,
+                    tournament_points: 0,
+                  });
+                }
+              }
+            }
+
+            // Insert match_participants
+            if (matchParticipants.length > 0) {
+              // @ts-ignore
+              const { error: mpError } = await (supabase as any)
+                .from("match_participants")
+                .insert(matchParticipants);
+              if (mpError) throw mpError;
+            }
+          }
+
+          toast.success(`Generated ${matches.length} matches with smart pairing across ${rounds} round${rounds > 1 ? 's' : ''}`);
+        } else {
+          // Manual mode for non-Catan: Create blank matches without participants
+          const matchesPerRound = Math.ceil(participants.length / 2);
+          
+          for (let round = 1; round <= rounds; round++) {
+            for (let i = 0; i < matchesPerRound; i++) {
+              matches.push({
+                tournament_id: tournamentId,
+                round: round,
+                player1_id: null,
+                player2_id: null,
+                status: "pending",
+              });
+            }
+          }
+
+          const { error } = await supabase.from("matches").insert(matches);
+          if (error) throw error;
+
+          toast.success(`Generated ${matches.length} blank matches for manual assignment`);
         }
-
-        const { error } = await supabase.from("matches").insert(matches);
-        if (error) throw error;
-
-        toast.success(`Generated ${matches.length} blank matches for manual assignment`);
       } else if (tournamentType === "catan") {
         // Generate Catan pairings with no repeats
         const allRoundMatches = generateCatanPairings(participants, rounds);
