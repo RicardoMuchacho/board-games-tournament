@@ -87,9 +87,17 @@ const TournamentDetail = () => {
           </TabsContent>
           <TabsContent value="matches" className="mt-6">
             {tournament.type === "catan" ? (
-              <CatanMatchesTab tournamentId={id!} />
+              <CatanMatchesTab 
+                tournamentId={id!} 
+                numberOfRounds={tournament.number_of_rounds}
+              />
             ) : (
-              <MatchesTab tournamentId={id!} tournamentType={tournament.type} />
+              <MatchesTab 
+                tournamentId={id!} 
+                tournamentType={tournament.type}
+                numberOfRounds={tournament.number_of_rounds}
+                playersPerMatch={tournament.players_per_match}
+              />
             )}
           </TabsContent>
           <TabsContent value="leaderboard" className="mt-6">

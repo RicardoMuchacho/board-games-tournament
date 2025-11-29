@@ -4,25 +4,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit } from "lucide-react";
+import { Search, Edit, Plus, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { EditMatchParticipants } from "./EditMatchParticipants";
+import { generateSwissPairings, generateRoundRobinPairings } from "@/lib/tournamentPairing";
 
 interface MatchesTabProps {
   tournamentId: string;
   tournamentType?: string;
+  numberOfRounds?: number;
+  playersPerMatch?: number;
 }
 
-export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) => {
+export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playersPerMatch = 2 }: MatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
   const [scores, setScores] = useState<{ [key: string]: { p1: number; p2: number } }>({});
   const [winners, setWinners] = useState<{ [key: string]: string | null }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMatch, setEditingMatch] = useState<{ id: string; player1Id?: string; player2Id?: string } | null>(null);
+  const [generatingRound, setGeneratingRound] = useState(false);
 
   useEffect(() => {
     fetchMatches();
+    fetchParticipants();
 
     const channel = supabase
       .channel(`matches-${tournamentId}`)
@@ -39,6 +45,17 @@ export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) =>
       supabase.removeChannel(channel);
     };
   }, [tournamentId]);
+
+  const fetchParticipants = async () => {
+    const { data, error } = await supabase
+      .from("participants")
+      .select("*")
+      .eq("tournament_id", tournamentId);
+    
+    if (!error && data) {
+      setParticipants(data);
+    }
+  };
 
   const fetchMatches = async () => {
     const { data, error } = await supabase
@@ -197,6 +214,89 @@ export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) =>
     }
   };
 
+  const generateNextRound = async (mode: "auto" | "manual") => {
+    const nextRound = rounds.length > 0 ? Math.max(...rounds) + 1 : 1;
+    
+    if (numberOfRounds && nextRound > numberOfRounds) {
+      toast.error(`Maximum rounds (${numberOfRounds}) reached`);
+      return;
+    }
+
+    if (participants.length < 2) {
+      toast.error("Need at least 2 participants");
+      return;
+    }
+
+    // Eliminatory tournaments auto-generate next round via checkAndGenerateNextRound
+    if (tournamentType === "eliminatory") {
+      toast.info("Eliminatory tournaments auto-generate next rounds when all matches complete");
+      return;
+    }
+
+    setGeneratingRound(true);
+    try {
+      const newMatches: any[] = [];
+
+      if (mode === "auto") {
+        if (tournamentType === "swiss") {
+          // Build existing matches for Swiss pairing algorithm
+          const existingMatchPairs = matches.map(m => [
+            participants.find(p => p.id === m.player1_id),
+            participants.find(p => p.id === m.player2_id)
+          ].filter(Boolean));
+
+          // Generate pairings for all rounds up to nextRound
+          const allRoundMatches = generateSwissPairings(participants, nextRound, existingMatchPairs, playersPerMatch);
+          const roundMatches = allRoundMatches[nextRound - 1] || [];
+
+          for (const matchPlayers of roundMatches) {
+            newMatches.push({
+              tournament_id: tournamentId,
+              round: nextRound,
+              player1_id: matchPlayers[0]?.id,
+              player2_id: matchPlayers[1]?.id,
+              status: "pending",
+            });
+          }
+        } else if (tournamentType === "round_robin") {
+          // Round robin doesn't need additional rounds typically
+          toast.info("Round robin tournaments have all matches in one round");
+          setGeneratingRound(false);
+          return;
+        }
+
+        const { error } = await supabase.from("matches").insert(newMatches);
+        if (error) throw error;
+
+        toast.success(`Round ${nextRound} generated with smart pairing`);
+      } else {
+        // Manual mode: create blank matches
+        const matchesNeeded = Math.ceil(participants.length / 2);
+        
+        for (let i = 0; i < matchesNeeded; i++) {
+          newMatches.push({
+            tournament_id: tournamentId,
+            round: nextRound,
+            player1_id: null,
+            player2_id: null,
+            status: "pending",
+          });
+        }
+
+        const { error } = await supabase.from("matches").insert(newMatches);
+        if (error) throw error;
+
+        toast.success(`Round ${nextRound} created with ${matchesNeeded} blank matches`);
+      }
+
+      setSelectedRound(nextRound);
+    } catch (error: any) {
+      toast.error("Failed to generate round: " + error.message);
+    } finally {
+      setGeneratingRound(false);
+    }
+  };
+
   const groupedMatches = matches.reduce((acc, match) => {
     const round = match.round;
     if (!acc[round]) acc[round] = [];
@@ -234,7 +334,7 @@ export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) =>
         </Card>
       ) : (
         <>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             {rounds.map((round) => (
               <Button
                 key={round}
@@ -244,6 +344,28 @@ export const MatchesTab = ({ tournamentId, tournamentType }: MatchesTabProps) =>
                 Round {round}
               </Button>
             ))}
+            {tournamentType !== "eliminatory" && tournamentType !== "round_robin" && (
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => generateNextRound("auto")}
+                  disabled={generatingRound}
+                  className="gap-2"
+                >
+                  <Shuffle className="h-4 w-4" />
+                  Auto Next Round
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => generateNextRound("manual")}
+                  disabled={generatingRound}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Manual Next Round
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="relative">
