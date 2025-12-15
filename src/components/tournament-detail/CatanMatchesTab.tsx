@@ -4,17 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit, Plus, Shuffle } from "lucide-react";
+import { Search, Edit, Plus, Shuffle, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { EditCatanMatchParticipants } from "./EditCatanMatchParticipants";
+import { RoundQRDialog } from "./RoundQRDialog";
 import { generateCatanPairings, calculateTableDistribution } from "@/lib/tournamentPairing";
 
 interface CatanMatchesTabProps {
   tournamentId: string;
   numberOfRounds?: number;
+  checkInToken?: string;
+  tournamentName?: string;
 }
 
-export const CatanMatchesTab = ({ tournamentId, numberOfRounds }: CatanMatchesTabProps) => {
+export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, tournamentName }: CatanMatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [matchParticipants, setMatchParticipants] = useState<{ [key: string]: any[] }>({});
@@ -31,6 +34,7 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds }: CatanMatchesTa
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMatch, setEditingMatch] = useState<{ id: string; participantIds: string[] } | null>(null);
   const [generatingRound, setGeneratingRound] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
 
   useEffect(() => {
     fetchMatches();
@@ -329,6 +333,16 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds }: CatanMatchesTa
               </Button>
             ))}
             <div className="flex gap-2 ml-auto">
+              {checkInToken && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowQRDialog(true)}
+                  className="gap-2"
+                >
+                  <QrCode className="h-4 w-4" />
+                  QR Results
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => generateNextRound("auto")}
@@ -496,6 +510,16 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds }: CatanMatchesTa
           currentParticipantIds={editingMatch.participantIds}
           tournamentId={tournamentId}
           roundNumber={selectedRound}
+        />
+      )}
+
+      {checkInToken && (
+        <RoundQRDialog
+          open={showQRDialog}
+          onOpenChange={setShowQRDialog}
+          checkInToken={checkInToken}
+          tournamentName={tournamentName || "Tournament"}
+          round={selectedRound}
         />
       )}
     </div>
