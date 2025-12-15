@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Edit, Plus, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { EditCatanMatchParticipants } from "./EditCatanMatchParticipants";
-import { generateCatanPairings } from "@/lib/tournamentPairing";
+import { generateCatanPairings, calculateTableDistribution } from "@/lib/tournamentPairing";
 
 interface CatanMatchesTabProps {
   tournamentId: string;
@@ -270,8 +270,9 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds }: CatanMatchesTa
 
         toast.success(`Round ${nextRound} generated with smart pairing`);
       } else {
-        // Manual mode: create blank matches
-        const tablesNeeded = Math.ceil(participants.length / 4);
+        // Manual mode: create blank matches with smart distribution
+        const { tableSizes } = calculateTableDistribution(participants.length, 4, 3);
+        const tablesNeeded = tableSizes.length;
         
         for (let i = 0; i < tablesNeeded; i++) {
           newMatches.push({
@@ -288,7 +289,12 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds }: CatanMatchesTa
         const { error } = await supabase.from("matches").insert(newMatches);
         if (error) throw error;
 
-        toast.success(`Round ${nextRound} created with ${tablesNeeded} blank tables`);
+        const tablesOf4 = tableSizes.filter(s => s === 4).length;
+        const tablesOf3 = tableSizes.filter(s => s === 3).length;
+        const distribution = tablesOf3 > 0 
+          ? `(${tablesOf4} tables of 4, ${tablesOf3} tables of 3)` 
+          : '';
+        toast.success(`Round ${nextRound} created with ${tablesNeeded} blank tables ${distribution}`);
       }
 
       setSelectedRound(nextRound);
