@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Users } from "lucide-react";
+import { Copy, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -60,6 +60,60 @@ export const TournamentList = () => {
     }
   };
 
+  const handleCopy = async (tournament: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Create new tournament with same format
+      const { data: newTournament, error: tournamentError } = await supabase
+        .from("tournaments")
+        .insert({
+          name: `${tournament.name} (Copy)`,
+          type: tournament.type,
+          number_of_participants: tournament.number_of_participants,
+          number_of_rounds: tournament.number_of_rounds,
+          players_per_match: tournament.players_per_match,
+          match_generation_mode: tournament.match_generation_mode,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (tournamentError) throw tournamentError;
+
+      // Fetch and copy participants
+      const { data: originalParticipants, error: participantsError } = await supabase
+        .from("participants")
+        .select("name, phone")
+        .eq("tournament_id", tournament.id);
+
+      if (participantsError) throw participantsError;
+
+      if (originalParticipants && originalParticipants.length > 0) {
+        const newParticipants = originalParticipants.map(p => ({
+          name: p.name,
+          phone: p.phone,
+          tournament_id: newTournament.id,
+          checked_in: false,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("participants")
+          .insert(newParticipants);
+
+        if (insertError) throw insertError;
+      }
+
+      toast.success("Tournament copied successfully");
+    } catch (error: any) {
+      toast.error("Failed to copy tournament: " + error.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -99,14 +153,25 @@ export const TournamentList = () => {
                   {tournament.type.replace("_", " ")} Tournament
                 </CardDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={(e) => handleDelete(tournament.id, e)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => handleCopy(tournament, e)}
+                  title="Copy tournament"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={(e) => handleDelete(tournament.id, e)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
