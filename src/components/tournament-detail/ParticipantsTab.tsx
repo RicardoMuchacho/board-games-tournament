@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Shuffle, Edit as EditIcon } from "lucide-react";
+import { Plus, Trash2, Shuffle, Edit as EditIcon, CheckCircle2, Circle, QrCode, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { EditParticipantDialog } from "./EditParticipantDialog";
+import { CheckInQRDialog } from "./CheckInQRDialog";
+import { ExcelImportDialog } from "./ExcelImportDialog";
 import {
   Command,
   CommandEmpty,
@@ -34,9 +36,18 @@ interface ParticipantsTabProps {
   numberOfRounds?: number;
   matchGenerationMode?: string;
   playersPerMatch?: number;
+  checkInToken?: string;
 }
 
-export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants, numberOfRounds, matchGenerationMode, playersPerMatch = 2 }: ParticipantsTabProps) => {
+export const ParticipantsTab = ({ 
+  tournamentId, 
+  tournamentType, 
+  maxParticipants, 
+  numberOfRounds, 
+  matchGenerationMode, 
+  playersPerMatch = 2,
+  checkInToken
+}: ParticipantsTabProps) => {
   const navigate = useNavigate();
   const [participants, setParticipants] = useState<any[]>([]);
   const [existingNames, setExistingNames] = useState<string[]>([]);
@@ -44,6 +55,8 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<{ id: string; name: string } | null>(null);
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [showExcelDialog, setShowExcelDialog] = useState(false);
 
   useEffect(() => {
     fetchParticipants();
@@ -124,6 +137,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
       {
         tournament_id: tournamentId,
         name: newName.trim(),
+        checked_in: false,
       },
     ]);
 
@@ -147,23 +161,74 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
     toast.success("Participant removed");
   };
 
+  const toggleCheckIn = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ checked_in: !currentStatus })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Failed to update check-in status");
+      return;
+    }
+    toast.success(currentStatus ? "Checked out" : "Checked in");
+  };
+
+  const checkInAll = async () => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ checked_in: true })
+      .eq("tournament_id", tournamentId);
+
+    if (error) {
+      toast.error("Failed to check in all participants");
+      return;
+    }
+    toast.success("All participants checked in");
+  };
+
   const generateMatches = async () => {
+    const checkedInParticipants = participants.filter(p => p.checked_in);
+    const notCheckedIn = participants.filter(p => !p.checked_in);
     const isManualMode = matchGenerationMode === "manual";
     
+    if (checkedInParticipants.length === 0) {
+      toast.error("No participants checked in. Please check in participants before generating matches.");
+      return;
+    }
+
     if (!isManualMode) {
       if (tournamentType === "catan") {
-        if (participants.length < 3) {
-          toast.error("Catan needs at least 3 participants");
+        if (checkedInParticipants.length < 3) {
+          toast.error("Catan needs at least 3 checked-in participants");
           return;
         }
-      } else if (participants.length < 2) {
-        toast.error("Need at least 2 participants");
+      } else if (checkedInParticipants.length < 2) {
+        toast.error("Need at least 2 checked-in participants");
         return;
       }
     }
 
+    // Confirm deletion of non-checked-in participants
+    if (notCheckedIn.length > 0) {
+      const confirmed = window.confirm(
+        `${notCheckedIn.length} participant(s) are not checked in and will be removed from the tournament. Continue?`
+      );
+      if (!confirmed) return;
+    }
+
     setLoading(true);
     try {
+      // Delete non-checked-in participants
+      if (notCheckedIn.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("participants")
+          .delete()
+          .in("id", notCheckedIn.map(p => p.id));
+        
+        if (deleteError) throw deleteError;
+      }
+
       // Delete existing matches and match_participants
       await supabase.from("matches").delete().eq("tournament_id", tournamentId);
 
@@ -171,41 +236,13 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
       const matchParticipants: any[] = [];
       const rounds = numberOfRounds || 1;
 
+      // Use only checked-in participants for match generation
+      const activeParticipants = checkedInParticipants;
+
       if (isManualMode) {
         if (tournamentType === "catan") {
-          // Manual mode for Catan: Generate smart pairings that avoid previous matchups
-          // First, fetch existing matches to build history
-          const { data: existingMatchesData } = await supabase
-            .from("matches")
-            .select("id, round")
-            .eq("tournament_id", tournamentId);
-
-          // Fetch existing match participants to build pairing history
-          const existingMatchIds = existingMatchesData?.map(m => m.id) || [];
-          let existingPairings: any[][] = [];
-          
-          if (existingMatchIds.length > 0) {
-            // @ts-ignore
-            const { data: mpData } = await (supabase as any)
-              .from("match_participants")
-              .select("match_id, participant_id")
-              .in("match_id", existingMatchIds);
-
-            // Group by match
-            const matchGroups: { [key: string]: string[] } = {};
-            mpData?.forEach((mp: any) => {
-              if (!matchGroups[mp.match_id]) matchGroups[mp.match_id] = [];
-              matchGroups[mp.match_id].push(mp.participant_id);
-            });
-
-            // Convert to participant objects for the pairing algorithm
-            existingPairings = Object.values(matchGroups).map(participantIds =>
-              participantIds.map(id => participants.find(p => p.id === id)).filter(Boolean)
-            );
-          }
-
           // Generate smart pairings using the existing algorithm
-          const allRoundMatches = generateCatanPairings(participants, rounds);
+          const allRoundMatches = generateCatanPairings(activeParticipants, rounds);
           
           for (let round = 1; round <= rounds; round++) {
             const roundMatches = allRoundMatches[round - 1] || [];
@@ -264,7 +301,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
           toast.success(`Generated ${matches.length} matches with smart pairing across ${rounds} round${rounds > 1 ? 's' : ''}`);
         } else {
           // Manual mode for non-Catan: Create blank matches without participants
-          const matchesPerRound = Math.ceil(participants.length / 2);
+          const matchesPerRound = Math.ceil(activeParticipants.length / 2);
           
           for (let round = 1; round <= rounds; round++) {
             for (let i = 0; i < matchesPerRound; i++) {
@@ -285,7 +322,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
         }
       } else if (tournamentType === "catan") {
         // Generate Catan pairings with no repeats
-        const allRoundMatches = generateCatanPairings(participants, rounds);
+        const allRoundMatches = generateCatanPairings(activeParticipants, rounds);
         
         for (let round = 1; round <= rounds; round++) {
           const roundMatches = allRoundMatches[round - 1] || [];
@@ -344,7 +381,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
         toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       } else if (tournamentType === "round_robin") {
         // Generate Round Robin pairings
-        const allRoundMatches = generateRoundRobinPairings(participants);
+        const allRoundMatches = generateRoundRobinPairings(activeParticipants);
         const roundMatches = allRoundMatches[0];
         
         for (const [player1, player2] of roundMatches) {
@@ -363,7 +400,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
         toast.success(`Generated ${matches.length} matches`);
       } else if (tournamentType === "eliminatory") {
         // Generate Eliminatory bracket
-        const allRoundMatches = generateEliminatoryPairings(participants);
+        const allRoundMatches = generateEliminatoryPairings(activeParticipants);
         const roundMatches = allRoundMatches[0];
         
         for (const [player1, player2] of roundMatches) {
@@ -382,7 +419,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
         toast.success(`Generated ${matches.length} matches`);
       } else {
         // Swiss: Generate pairings with win-based matching
-        const allRoundMatches = generateSwissPairings(participants, rounds, [], playersPerMatch);
+        const allRoundMatches = generateSwissPairings(activeParticipants, rounds, [], playersPerMatch);
         
         for (let round = 1; round <= rounds; round++) {
           const roundMatches = allRoundMatches[round - 1] || [];
@@ -403,6 +440,11 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
 
         toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       }
+
+      // Refresh participants list after deletion
+      if (notCheckedIn.length > 0) {
+        fetchParticipants();
+      }
     } catch (error) {
       console.error("Match generation error:", error);
       toast.error("Failed to generate matches");
@@ -411,18 +453,20 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
     }
   };
 
+  const checkedInCount = participants.filter(p => p.checked_in).length;
+
   return (
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
                   aria-expanded={open}
-                  className="flex-1 justify-start"
+                  className="flex-1 min-w-[200px] justify-start"
                 >
                   {newName || "Select existing or type new name..."}
                 </Button>
@@ -459,6 +503,7 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
                                     {
                                       tournament_id: tournamentId,
                                       name: selectedName,
+                                      checked_in: false,
                                     },
                                   ]);
 
@@ -497,37 +542,79 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
               <Plus className="h-4 w-4" />
               Add
             </Button>
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => setShowExcelDialog(true)}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Import Excel
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">
-          {participants.length} {maxParticipants ? `/ ${maxParticipants}` : ""} Participants
-        </h3>
-        <Button 
-          onClick={generateMatches} 
-          disabled={loading || (matchGenerationMode !== "manual" && participants.length < 2)} 
-          className="gap-2"
-        >
-          <Shuffle className="h-4 w-4" />
-          Generate Matches
-        </Button>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div>
+          <h3 className="text-lg font-semibold">
+            {participants.length} {maxParticipants ? `/ ${maxParticipants}` : ""} Participants
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {checkedInCount} checked in
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2" onClick={checkInAll}>
+            <CheckCircle2 className="h-4 w-4" />
+            Check In All
+          </Button>
+          {checkInToken && (
+            <Button variant="outline" className="gap-2" onClick={() => setShowQRDialog(true)}>
+              <QrCode className="h-4 w-4" />
+              QR Code
+            </Button>
+          )}
+          <Button 
+            onClick={generateMatches} 
+            disabled={loading || checkedInCount === 0} 
+            className="gap-2"
+          >
+            <Shuffle className="h-4 w-4" />
+            Generate Matches
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
         {participants.map((participant) => (
           <Card 
             key={participant.id}
-            className="cursor-pointer hover:bg-accent/50 transition-colors"
+            className={`cursor-pointer hover:bg-accent/50 transition-colors ${
+              participant.checked_in ? "border-green-500/50 bg-green-500/5" : ""
+            }`}
           >
             <CardContent className="flex items-center justify-between p-4">
-              <span 
-                className="font-medium flex-1"
-                onClick={() => navigate(`/participant/${participant.id}`)}
-              >
-                {participant.name}
-              </span>
+              <div className="flex items-center gap-2 flex-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleCheckIn(participant.id, participant.checked_in);
+                  }}
+                  className="p-1 hover:bg-accent rounded"
+                >
+                  {participant.checked_in ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </button>
+                <span 
+                  className="font-medium flex-1"
+                  onClick={() => navigate(`/participant/${participant.id}`)}
+                >
+                  {participant.name}
+                </span>
+              </div>
               <div className="flex gap-1">
                 <Button
                   variant="ghost"
@@ -565,6 +652,22 @@ export const ParticipantsTab = ({ tournamentId, tournamentType, maxParticipants,
           currentName={editingParticipant.name}
         />
       )}
+
+      {checkInToken && (
+        <CheckInQRDialog
+          open={showQRDialog}
+          onOpenChange={setShowQRDialog}
+          checkInToken={checkInToken}
+        />
+      )}
+
+      <ExcelImportDialog
+        open={showExcelDialog}
+        onOpenChange={setShowExcelDialog}
+        tournamentId={tournamentId}
+        maxParticipants={maxParticipants}
+        currentCount={participants.length}
+      />
     </div>
   );
 };

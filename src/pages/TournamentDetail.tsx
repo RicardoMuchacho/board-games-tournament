@@ -83,6 +83,7 @@ const TournamentDetail = () => {
               numberOfRounds={tournament.number_of_rounds}
               matchGenerationMode={tournament.match_generation_mode}
               playersPerMatch={tournament.players_per_match}
+              checkInToken={tournament.check_in_token}
             />
           </TabsContent>
           <TabsContent value="matches" className="mt-6">
