@@ -158,21 +158,27 @@ export type Database = {
       }
       participants: {
         Row: {
+          checked_in: boolean | null
           created_at: string | null
           id: string
           name: string
+          phone: string | null
           tournament_id: string | null
         }
         Insert: {
+          checked_in?: boolean | null
           created_at?: string | null
           id?: string
           name: string
+          phone?: string | null
           tournament_id?: string | null
         }
         Update: {
+          checked_in?: boolean | null
           created_at?: string | null
           id?: string
           name?: string
+          phone?: string | null
           tournament_id?: string | null
         }
         Relationships: [
@@ -187,6 +193,7 @@ export type Database = {
       }
       tournaments: {
         Row: {
+          check_in_token: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -200,6 +207,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          check_in_token?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -213,6 +221,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          check_in_token?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
