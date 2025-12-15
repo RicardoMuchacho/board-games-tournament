@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit, Plus, Shuffle } from "lucide-react";
+import { Search, Edit, Plus, Shuffle, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { EditMatchParticipants } from "./EditMatchParticipants";
+import { RoundQRDialog } from "./RoundQRDialog";
 import { generateSwissPairings, generateRoundRobinPairings } from "@/lib/tournamentPairing";
 
 interface MatchesTabProps {
@@ -14,9 +15,11 @@ interface MatchesTabProps {
   tournamentType?: string;
   numberOfRounds?: number;
   playersPerMatch?: number;
+  checkInToken?: string;
+  tournamentName?: string;
 }
 
-export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playersPerMatch = 2 }: MatchesTabProps) => {
+export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playersPerMatch = 2, checkInToken, tournamentName }: MatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [scores, setScores] = useState<{ [key: string]: { p1: number; p2: number } }>({});
@@ -25,6 +28,7 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMatch, setEditingMatch] = useState<{ id: string; player1Id?: string; player2Id?: string } | null>(null);
   const [generatingRound, setGeneratingRound] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
 
   useEffect(() => {
     fetchMatches();
@@ -344,6 +348,16 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
                 Round {round}
               </Button>
             ))}
+            {checkInToken && (
+              <Button
+                variant="outline"
+                onClick={() => setShowQRDialog(true)}
+                className="gap-2"
+              >
+                <QrCode className="h-4 w-4" />
+                QR Results
+              </Button>
+            )}
             {tournamentType !== "eliminatory" && tournamentType !== "round_robin" && (
               <div className="flex gap-2 ml-auto">
                 <Button
@@ -516,6 +530,16 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
           currentPlayer2Id={editingMatch.player2Id}
           tournamentId={tournamentId}
           roundNumber={selectedRound}
+        />
+      )}
+
+      {checkInToken && (
+        <RoundQRDialog
+          open={showQRDialog}
+          onOpenChange={setShowQRDialog}
+          checkInToken={checkInToken}
+          tournamentName={tournamentName || "Tournament"}
+          round={selectedRound}
         />
       )}
     </div>

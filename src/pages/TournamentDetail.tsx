@@ -91,6 +91,8 @@ const TournamentDetail = () => {
               <CatanMatchesTab 
                 tournamentId={id!} 
                 numberOfRounds={tournament.number_of_rounds}
+                checkInToken={tournament.check_in_token}
+                tournamentName={tournament.name}
               />
             ) : (
               <MatchesTab 
@@ -98,6 +100,8 @@ const TournamentDetail = () => {
                 tournamentType={tournament.type}
                 numberOfRounds={tournament.number_of_rounds}
                 playersPerMatch={tournament.players_per_match}
+                checkInToken={tournament.check_in_token}
+                tournamentName={tournament.name}
               />
             )}
           </TabsContent>
