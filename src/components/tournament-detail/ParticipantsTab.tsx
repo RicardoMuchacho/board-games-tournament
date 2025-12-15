@@ -26,7 +26,8 @@ import {
   generateCatanPairings, 
   generateSwissPairings, 
   generateRoundRobinPairings, 
-  generateEliminatoryPairings 
+  generateEliminatoryPairings,
+  calculateTableDistribution
 } from "@/lib/tournamentPairing";
 
 interface ParticipantsTabProps {
@@ -300,8 +301,9 @@ export const ParticipantsTab = ({
 
           toast.success(`Generated ${matches.length} matches with smart pairing across ${rounds} round${rounds > 1 ? 's' : ''}`);
         } else {
-          // Manual mode for non-Catan: Create blank matches without participants
-          const matchesPerRound = Math.ceil(activeParticipants.length / 2);
+          // Manual mode for non-Catan: Create blank matches with smart distribution
+          const { tableSizes } = calculateTableDistribution(activeParticipants.length, playersPerMatch, 2);
+          const matchesPerRound = tableSizes.length || Math.ceil(activeParticipants.length / playersPerMatch);
           
           for (let round = 1; round <= rounds; round++) {
             for (let i = 0; i < matchesPerRound; i++) {

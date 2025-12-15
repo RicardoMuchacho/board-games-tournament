@@ -52,6 +52,42 @@ function havePlayedTogether(players: Participant[], history: PairingHistory): bo
 }
 
 /**
+ * Calculate optimal table distribution for given number of players
+ * Returns the number of tables with targetSize players and minSize players
+ */
+export function calculateTableDistribution(
+  totalPlayers: number, 
+  targetSize: number = 4, 
+  minSize: number = 3
+): { tablesOfTarget: number; tablesOfMin: number; tableSizes: number[] } {
+  if (totalPlayers < minSize) {
+    return { tablesOfTarget: 0, tablesOfMin: 0, tableSizes: [] };
+  }
+
+  // Try to maximize tables of targetSize
+  for (let tablesOfTarget = Math.floor(totalPlayers / targetSize); tablesOfTarget >= 0; tablesOfTarget--) {
+    const remaining = totalPlayers - (tablesOfTarget * targetSize);
+    if (remaining === 0) {
+      const tableSizes = Array(tablesOfTarget).fill(targetSize);
+      return { tablesOfTarget, tablesOfMin: 0, tableSizes };
+    }
+    if (remaining >= minSize && remaining % minSize === 0) {
+      const tablesOfMin = remaining / minSize;
+      const tableSizes = [
+        ...Array(tablesOfTarget).fill(targetSize),
+        ...Array(tablesOfMin).fill(minSize)
+      ];
+      return { tablesOfTarget, tablesOfMin, tableSizes };
+    }
+  }
+  
+  // Fallback: all tables of minSize
+  const tablesOfMin = Math.floor(totalPlayers / minSize);
+  const tableSizes = Array(tablesOfMin).fill(minSize);
+  return { tablesOfTarget: 0, tablesOfMin, tableSizes };
+}
+
+/**
  * Generate Catan pairings (3-4 players per match) with no repeats
  */
 export function generateCatanPairings(
@@ -66,17 +102,21 @@ export function generateCatanPairings(
     history[p.id] = new Set<string>();
   });
   
+  // Calculate optimal table distribution
+  const { tableSizes } = calculateTableDistribution(participants.length, 4, 3);
+  
   for (let round = 1; round <= rounds; round++) {
     const roundMatches: Participant[][] = [];
     const availablePlayers = [...participants];
+    let tableIndex = 0;
     let attempts = 0;
     const maxAttempts = 1000;
     
-    while (availablePlayers.length >= 3 && attempts < maxAttempts) {
+    while (availablePlayers.length >= 3 && tableIndex < tableSizes.length && attempts < maxAttempts) {
       attempts++;
       
-      // Try to create a match of 4 players first, then 3
-      const matchSize = availablePlayers.length >= 4 ? 4 : 3;
+      // Use pre-calculated table size for this table
+      const matchSize = tableSizes[tableIndex];
       let bestMatch: Participant[] | null = null;
       let minConflicts = Infinity;
       
@@ -107,6 +147,7 @@ export function generateCatanPairings(
       // Only accept matches with conflicts if we've tried many times
       if (bestMatch && (minConflicts === 0 || attempts > 50)) {
         roundMatches.push(bestMatch);
+        tableIndex++;
         
         // Update history
         for (let i = 0; i < bestMatch.length; i++) {
