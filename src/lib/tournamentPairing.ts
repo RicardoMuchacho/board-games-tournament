@@ -3,9 +3,17 @@
  * Ensures no player faces the same opponent twice across rounds
  */
 
-interface Participant {
+export interface Participant {
   id: string;
   name: string;
+}
+
+export interface Game {
+  id: string;
+  name: string;
+  available_tables: number;
+  players_per_table: number;
+  min_players: number;
 }
 
 interface PairingHistory {
@@ -318,4 +326,114 @@ export function generateEliminatoryPairings(participants: Participant[]): Partic
   
   // Return as single round (first round only, subsequent rounds depend on results)
   return [matches];
+}
+
+/**
+ * Generate Multi-Game pairings
+ * Ensures players don't repeat opponents and don't repeat games
+ */
+export interface ParticipantHistory {
+  playedWith: Set<string>;
+  playedGames: Set<string>;
+}
+
+export function generateMultiGamePairings(
+  participants: Participant[],
+  games: Game[],
+  history: Map<string, ParticipantHistory>
+): { gameId: string; tables: Participant[][] }[] {
+  const result: { gameId: string; tables: Participant[][] }[] = [];
+  const availablePlayers = [...participants];
+  
+  // Sort games by capacity (prioritize games with more capacity)
+  const sortedGames = [...games].sort((a, b) => 
+    (b.available_tables * b.players_per_table) - (a.available_tables * a.players_per_table)
+  );
+  
+  // For each participant, calculate game priority (games they haven't played)
+  const getGamePriority = (playerId: string, gameId: string): number => {
+    const playerHistory = history.get(playerId);
+    if (!playerHistory) return 1;
+    return playerHistory.playedGames.has(gameId) ? 0 : 1;
+  };
+  
+  // Score how good a player assignment to a game is
+  const scoreAssignment = (players: Participant[], gameId: string): number => {
+    let score = 0;
+    
+    // Prefer games players haven't played
+    for (const player of players) {
+      score += getGamePriority(player.id, gameId) * 10;
+    }
+    
+    // Penalize repeat opponents
+    for (let i = 0; i < players.length; i++) {
+      for (let j = i + 1; j < players.length; j++) {
+        const h1 = history.get(players[i].id);
+        if (h1?.playedWith.has(players[j].id)) {
+          score -= 5;
+        }
+      }
+    }
+    
+    return score;
+  };
+  
+  // Assign players to each game
+  for (const game of sortedGames) {
+    if (availablePlayers.length < game.min_players) continue;
+    
+    const gameTables: Participant[][] = [];
+    const { tableSizes } = calculateTableDistribution(
+      Math.min(availablePlayers.length, game.available_tables * game.players_per_table),
+      game.players_per_table,
+      game.min_players
+    );
+    
+    const maxTables = Math.min(game.available_tables, tableSizes.length);
+    
+    for (let tableIdx = 0; tableIdx < maxTables && availablePlayers.length >= game.min_players; tableIdx++) {
+      const tableSize = Math.min(
+        game.players_per_table,
+        availablePlayers.length
+      );
+      
+      if (tableSize < game.min_players) break;
+      
+      // Find best assignment for this table
+      let bestTable: Participant[] = [];
+      let bestScore = -Infinity;
+      
+      // Try multiple random combinations
+      for (let trial = 0; trial < 100; trial++) {
+        const shuffled = [...availablePlayers].sort(() => Math.random() - 0.5);
+        const candidate = shuffled.slice(0, tableSize);
+        const score = scoreAssignment(candidate, game.id);
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestTable = candidate;
+        }
+        
+        // Early exit if we found a great assignment
+        if (score >= tableSize * 10) break;
+      }
+      
+      if (bestTable.length >= game.min_players) {
+        gameTables.push(bestTable);
+        
+        // Remove assigned players from available pool
+        for (const player of bestTable) {
+          const idx = availablePlayers.findIndex(p => p.id === player.id);
+          if (idx !== -1) availablePlayers.splice(idx, 1);
+        }
+      }
+    }
+    
+    if (gameTables.length > 0) {
+      result.push({ gameId: game.id, tables: gameTables });
+    }
+  }
+  
+  return result;
 }

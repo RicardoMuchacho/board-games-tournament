@@ -125,7 +125,7 @@ const MatchResults = () => {
     if (!match) return;
 
     const participants = matchParticipants[selectedTable] || [];
-    const isCatan = tournament?.type === "catan";
+    const isCatanLike = tournament?.type === "catan" || tournament?.type === "multigame";
 
     // Validate results
     const resultEntries = Object.entries(results);
@@ -134,7 +134,7 @@ const MatchResults = () => {
       return;
     }
 
-    if (isCatan) {
+    if (isCatanLike) {
       const placements = resultEntries.map(([, r]) => r.placement).filter(p => p > 0);
       if (placements.length !== participants.length) {
         toast.error("Please enter placement for all players");
@@ -200,7 +200,7 @@ const MatchResults = () => {
     );
   }
 
-  const isCatan = tournament?.type === "catan";
+  const isCatanLike = tournament?.type === "catan" || tournament?.type === "multigame";
 
   // If a table is selected, show the result entry form
   if (selectedTable) {
@@ -223,7 +223,7 @@ const MatchResults = () => {
                 <div key={mp.participant.id} className="p-4 border rounded-lg space-y-3">
                   <div className="font-medium text-lg">{mp.participant.name}</div>
                   
-                  {isCatan ? (
+                  {isCatanLike ? (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-sm text-muted-foreground">Victory Points</label>
