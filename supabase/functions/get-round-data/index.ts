@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     if (round) {
       const { data: roundMatches, error: roundMatchesError } = await supabase
         .from("matches")
-        .select("*")
+        .select("*, game:games(id, name)")
         .eq("tournament_id", tournament.id)
         .eq("round", parseInt(round))
         .order("created_at");

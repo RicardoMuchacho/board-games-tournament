@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      games: {
+        Row: {
+          available_tables: number
+          created_at: string
+          id: string
+          min_players: number
+          name: string
+          order_index: number
+          players_per_table: number
+          tournament_id: string
+        }
+        Insert: {
+          available_tables?: number
+          created_at?: string
+          id?: string
+          min_players?: number
+          name: string
+          order_index?: number
+          players_per_table?: number
+          tournament_id: string
+        }
+        Update: {
+          available_tables?: number
+          created_at?: string
+          id?: string
+          min_players?: number
+          name?: string
+          order_index?: number
+          players_per_table?: number
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "games_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_participants: {
         Row: {
           created_at: string | null
@@ -62,6 +103,7 @@ export type Database = {
       matches: {
         Row: {
           created_at: string | null
+          game_id: string | null
           id: string
           player1_id: string | null
           player1_score: number | null
@@ -79,6 +121,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          game_id?: string | null
           id?: string
           player1_id?: string | null
           player1_score?: number | null
@@ -96,6 +139,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          game_id?: string | null
           id?: string
           player1_id?: string | null
           player1_score?: number | null
@@ -112,6 +156,13 @@ export type Database = {
           winner_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "matches_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "matches_player1_id_fkey"
             columns: ["player1_id"]
@@ -274,6 +325,19 @@ export type Database = {
           tournament_id: string
         }[]
       }
+      get_multigame_tournament_standings: {
+        Args: { tournament_id_input: string }
+        Returns: {
+          first_positions: number
+          games_played: number
+          id: string
+          matches_played: number
+          name: string
+          total_tournament_points: number
+          total_victory_points: number
+          tournament_id: string
+        }[]
+      }
       get_swiss_tournament_standings: {
         Args: { tournament_id_input: string }
         Returns: {
@@ -312,7 +376,12 @@ export type Database = {
     Enums: {
       app_role: "admin" | "moderator" | "user"
       match_status: "pending" | "in_progress" | "completed"
-      tournament_type: "swiss" | "eliminatory" | "round_robin" | "catan"
+      tournament_type:
+        | "swiss"
+        | "eliminatory"
+        | "round_robin"
+        | "catan"
+        | "multigame"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -442,7 +511,13 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "moderator", "user"],
       match_status: ["pending", "in_progress", "completed"],
-      tournament_type: ["swiss", "eliminatory", "round_robin", "catan"],
+      tournament_type: [
+        "swiss",
+        "eliminatory",
+        "round_robin",
+        "catan",
+        "multigame",
+      ],
     },
   },
 } as const

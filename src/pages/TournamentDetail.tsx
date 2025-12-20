@@ -8,8 +8,10 @@ import { EditTournamentDialog } from "@/components/tournament-detail/EditTournam
 import { ParticipantsTab } from "@/components/tournament-detail/ParticipantsTab";
 import { MatchesTab } from "@/components/tournament-detail/MatchesTab";
 import { CatanMatchesTab } from "@/components/tournament-detail/CatanMatchesTab";
+import { MultiGameMatchesTab } from "@/components/tournament-detail/MultiGameMatchesTab";
 import { LeaderboardTab } from "@/components/tournament-detail/LeaderboardTab";
 import { EliminatoryLeaderboardTab } from "@/components/tournament-detail/EliminatoryLeaderboardTab";
+import { MultiGameLeaderboardTab } from "@/components/tournament-detail/MultiGameLeaderboardTab";
 import { toast } from "sonner";
 
 const TournamentDetail = () => {
@@ -94,6 +96,13 @@ const TournamentDetail = () => {
                 checkInToken={tournament.check_in_token}
                 tournamentName={tournament.name}
               />
+            ) : tournament.type === "multigame" ? (
+              <MultiGameMatchesTab 
+                tournamentId={id!} 
+                numberOfRounds={tournament.number_of_rounds}
+                checkInToken={tournament.check_in_token}
+                tournamentName={tournament.name}
+              />
             ) : (
               <MatchesTab 
                 tournamentId={id!} 
@@ -103,6 +112,15 @@ const TournamentDetail = () => {
                 checkInToken={tournament.check_in_token}
                 tournamentName={tournament.name}
               />
+            )}
+          </TabsContent>
+          <TabsContent value="leaderboard" className="mt-6">
+            {tournament.type === "eliminatory" ? (
+              <EliminatoryLeaderboardTab tournamentId={id!} />
+            ) : tournament.type === "multigame" ? (
+              <MultiGameLeaderboardTab tournamentId={id!} />
+            ) : (
+              <LeaderboardTab tournamentId={id!} tournamentType={tournament.type} />
             )}
           </TabsContent>
           <TabsContent value="leaderboard" className="mt-6">
