@@ -641,6 +641,7 @@ export const MultiGameMatchesTab = ({
         onOpenChange={setShowQRDialog}
         checkInToken={checkInToken || ""}
         tournamentName={tournamentName || ""}
+        round={selectedRound}
       />
 
       <GameConfigDialog
