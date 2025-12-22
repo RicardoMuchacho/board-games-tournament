@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const token = url.searchParams.get("token");
-    const round = url.searchParams.get("round");
+    const roundParam = url.searchParams.get("round");
 
     if (!token) {
       return new Response(
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     // Find tournament by check_in_token
     const { data: tournament, error: tournamentError } = await supabase
       .from("tournaments")
-      .select("id, name, type, players_per_match")
+      .select("id, name, type, players_per_match, status")
       .eq("check_in_token", token)
       .single();
 
@@ -41,10 +41,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get all rounds for this tournament
+    // Get all matches with status
     const { data: allMatches, error: allMatchesError } = await supabase
       .from("matches")
-      .select("round")
+      .select("round, status")
       .eq("tournament_id", tournament.id);
 
     if (allMatchesError) {
@@ -57,16 +57,44 @@ Deno.serve(async (req) => {
 
     const rounds = [...new Set(allMatches?.map(m => m.round))].sort((a, b) => a - b);
 
-    // If round specified, get matches for that round
+    // Calculate current active round (first round with incomplete matches)
+    const roundStats: Record<number, { total: number; completed: number }> = {};
+    for (const match of allMatches || []) {
+      if (!roundStats[match.round]) {
+        roundStats[match.round] = { total: 0, completed: 0 };
+      }
+      roundStats[match.round].total++;
+      if (match.status === "completed") {
+        roundStats[match.round].completed++;
+      }
+    }
+
+    let currentRound: number | null = null;
+    for (const round of rounds) {
+      const stats = roundStats[round];
+      if (stats && stats.completed < stats.total) {
+        currentRound = round;
+        break;
+      }
+    }
+
+    // If all rounds complete, use the last round
+    if (currentRound === null && rounds.length > 0) {
+      currentRound = rounds[rounds.length - 1];
+    }
+
+    // Determine which round to fetch
+    const roundToFetch = roundParam ? parseInt(roundParam) : currentRound;
+
     let matches = [];
     let matchParticipants: Record<string, any[]> = {};
 
-    if (round) {
+    if (roundToFetch) {
       const { data: roundMatches, error: roundMatchesError } = await supabase
         .from("matches")
         .select("*, game:games(id, name)")
         .eq("tournament_id", tournament.id)
-        .eq("round", parseInt(round))
+        .eq("round", roundToFetch)
         .order("created_at");
 
       if (roundMatchesError) {
@@ -95,6 +123,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Calculate progress for current round
+    const currentRoundStats = currentRound ? roundStats[currentRound] : null;
+    const progress = currentRoundStats 
+      ? Math.round((currentRoundStats.completed / currentRoundStats.total) * 100)
+      : 0;
+
     return new Response(
       JSON.stringify({
         tournament: {
@@ -102,8 +136,11 @@ Deno.serve(async (req) => {
           name: tournament.name,
           type: tournament.type,
           players_per_match: tournament.players_per_match,
+          status: tournament.status || "active",
         },
         rounds,
+        currentRound,
+        progress,
         matches,
         matchParticipants,
       }),
