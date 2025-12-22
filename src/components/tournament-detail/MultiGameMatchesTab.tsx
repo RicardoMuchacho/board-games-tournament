@@ -4,12 +4,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit, Shuffle, QrCode, Settings } from "lucide-react";
+import { Search, Edit, Shuffle, QrCode, Settings, Flag, PlusCircle, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { EditCatanMatchParticipants } from "./EditCatanMatchParticipants";
 import { RoundQRDialog } from "./RoundQRDialog";
 import { GameConfigDialog } from "./GameConfigDialog";
 import { generateMultiGamePairings, Game } from "@/lib/tournamentPairing";
+import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MultiGameMatchesTabProps {
   tournamentId: string;
@@ -43,11 +54,14 @@ export const MultiGameMatchesTab = ({
   const [generatingRound, setGeneratingRound] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [showGameConfig, setShowGameConfig] = useState(false);
+  const [tournamentStatus, setTournamentStatus] = useState<string>("active");
+  const [showEndTournamentDialog, setShowEndTournamentDialog] = useState(false);
 
   useEffect(() => {
     fetchMatches();
     fetchParticipants();
     fetchGames();
+    fetchTournamentStatus();
 
     const matchesChannel = supabase
       .channel(`multigame-matches-${tournamentId}`)
@@ -73,11 +87,22 @@ export const MultiGameMatchesTab = ({
     };
   }, [tournamentId]);
 
+  const fetchTournamentStatus = async () => {
+    const { data } = await supabase
+      .from("tournaments")
+      .select("status")
+      .eq("id", tournamentId)
+      .single();
+    
+    if (data) setTournamentStatus(data.status || "active");
+  };
+
   const fetchParticipants = async () => {
     const { data, error } = await supabase
       .from("participants")
       .select("*")
-      .eq("tournament_id", tournamentId);
+      .eq("tournament_id", tournamentId)
+      .eq("checked_in", true);
     
     if (!error && data) setParticipants(data);
   };
@@ -93,7 +118,7 @@ export const MultiGameMatchesTab = ({
   };
 
   const fetchMatches = async () => {
-    const { data: matchesData, error: matchesError } = await supabase
+    const { data: matchesData, error: matchesError } = await (supabase as any)
       .from("matches")
       .select("*, game:games(id, name)")
       .eq("tournament_id", tournamentId)
@@ -167,10 +192,15 @@ export const MultiGameMatchesTab = ({
   const rounds = Object.keys(groupedMatches).map(r => parseInt(r)).sort((a, b) => a - b);
   const currentRoundMatches = groupedMatches[selectedRound] || [];
 
+  // Calculate round progress
+  const roundProgress = currentRoundMatches.length > 0
+    ? (currentRoundMatches.filter((m: any) => m.status === "completed").length / currentRoundMatches.length) * 100
+    : 0;
+
   // Group matches by game for display
   const matchesByGame = currentRoundMatches.reduce((acc: any, match: any) => {
     const gameId = match.game_id || "unassigned";
-    const gameName = match.game?.name || "Unassigned";
+    const gameName = match.game?.name || "Sin asignar";
     if (!acc[gameId]) acc[gameId] = { name: gameName, matches: [] };
     acc[gameId].matches.push(match);
     return acc;
@@ -203,12 +233,20 @@ export const MultiGameMatchesTab = ({
     }
 
     if (participants.length < 3) {
-      toast.error("Need at least 3 participants");
+      toast.error("Need at least 3 checked-in participants");
       return;
     }
 
     if (games.length === 0) {
       toast.error("Please configure games first");
+      setShowGameConfig(true);
+      return;
+    }
+
+    // Validate capacity
+    const totalCapacity = games.reduce((sum, g) => sum + g.available_tables * g.players_per_table, 0);
+    if (totalCapacity < participants.length) {
+      toast.error(`Insufficient capacity: ${totalCapacity} slots for ${participants.length} participants`);
       setShowGameConfig(true);
       return;
     }
@@ -243,8 +281,13 @@ export const MultiGameMatchesTab = ({
       }
 
       const pairings = generateMultiGamePairings(participants, games, existingHistory);
+      
+      if (pairings.length === 0) {
+        toast.error("Could not generate pairings. Check game configuration.");
+        return;
+      }
+
       const newMatches: any[] = [];
-      const newMatchParticipants: any[] = [];
 
       for (const gamePairing of pairings) {
         for (const table of gamePairing.tables) {
@@ -261,46 +304,94 @@ export const MultiGameMatchesTab = ({
         }
       }
 
-      const { data: insertedMatches, error: matchError } = await supabase
+      console.log("Inserting matches:", newMatches);
+
+      const { data: insertedMatches, error: matchError } = await (supabase as any)
         .from("matches")
         .insert(newMatches)
         .select();
 
-      if (matchError) throw matchError;
+      if (matchError) {
+        console.error("Match insertion error:", matchError);
+        throw matchError;
+      }
 
-      if (insertedMatches) {
+      console.log("Inserted matches:", insertedMatches);
+
+      if (insertedMatches && insertedMatches.length > 0) {
+        const newMatchParticipants: any[] = [];
         let matchIndex = 0;
+        
         for (const gamePairing of pairings) {
           for (const table of gamePairing.tables) {
             const match = insertedMatches[matchIndex];
-            for (const player of table) {
-              newMatchParticipants.push({
-                match_id: match.id,
-                participant_id: player.id,
-                victory_points: 0,
-                tournament_points: 0,
-              });
+            if (match) {
+              for (const player of table) {
+                newMatchParticipants.push({
+                  match_id: match.id,
+                  participant_id: player.id,
+                  victory_points: 0,
+                  tournament_points: 0,
+                });
+              }
             }
             matchIndex++;
           }
         }
 
+        console.log("Inserting match participants:", newMatchParticipants);
+
         if (newMatchParticipants.length > 0) {
           const { error: mpError } = await (supabase as any)
             .from("match_participants")
             .insert(newMatchParticipants);
-          if (mpError) throw mpError;
+          
+          if (mpError) {
+            console.error("Match participants error:", mpError);
+            throw mpError;
+          }
         }
       }
 
-      toast.success(`Round ${nextRound} generated`);
+      toast.success(`Round ${nextRound} generated with ${newMatches.length} matches`);
       setSelectedRound(nextRound);
+      fetchMatches();
     } catch (error: any) {
+      console.error("Generate round error:", error);
       toast.error("Failed to generate round: " + error.message);
     } finally {
       setGeneratingRound(false);
     }
   };
+
+  const endTournament = async () => {
+    try {
+      await supabase
+        .from("tournaments")
+        .update({ status: "finished" })
+        .eq("id", tournamentId);
+
+      setTournamentStatus("finished");
+      toast.success("Tournament finished!");
+      setShowEndTournamentDialog(false);
+    } catch (error: any) {
+      toast.error("Failed to end tournament: " + error.message);
+    }
+  };
+
+  if (tournamentStatus === "finished") {
+    return (
+      <Card className="border-green-500/30 bg-green-500/5">
+        <CardContent className="flex flex-col items-center justify-center h-48">
+          <Trophy className="h-12 w-12 text-green-500 mb-4" />
+          <p className="text-lg font-medium">Tournament Finished</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Check the leaderboard for final standings
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -322,7 +413,7 @@ export const MultiGameMatchesTab = ({
           <CardContent className="flex flex-col items-center justify-center h-48">
             <p className="text-muted-foreground">No matches yet</p>
             <p className="text-sm text-muted-foreground mt-2">
-              {games.length} game(s) configured. Generate the first round to start.
+              {games.length} game(s) configured, {participants.length} participants checked in
             </p>
             <div className="flex gap-2 mt-4">
               <Button variant="outline" onClick={() => setShowGameConfig(true)} className="gap-2">
@@ -338,6 +429,17 @@ export const MultiGameMatchesTab = ({
         </Card>
       ) : (
         <>
+          {/* Round Progress */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span>Round {selectedRound} Progress</span>
+              <span className="text-muted-foreground">
+                {currentRoundMatches.filter((m: any) => m.status === "completed").length} / {currentRoundMatches.length} completed
+              </span>
+            </div>
+            <Progress value={roundProgress} className="h-2" />
+          </div>
+
           <div className="flex gap-2 flex-wrap items-center">
             {rounds.map((round) => (
               <Button
@@ -348,7 +450,7 @@ export const MultiGameMatchesTab = ({
                 Round {round}
               </Button>
             ))}
-            <div className="flex gap-2 ml-auto">
+            <div className="flex gap-2 ml-auto flex-wrap">
               <Button variant="outline" onClick={() => setShowGameConfig(true)} className="gap-2">
                 <Settings className="h-4 w-4" />
                 Games
@@ -356,17 +458,26 @@ export const MultiGameMatchesTab = ({
               {checkInToken && (
                 <Button variant="outline" onClick={() => setShowQRDialog(true)} className="gap-2">
                   <QrCode className="h-4 w-4" />
-                  QR Results
+                  QR
                 </Button>
               )}
               <Button
                 variant="outline"
                 onClick={generateNextRound}
-                disabled={generatingRound}
+                disabled={generatingRound || roundProgress < 100}
+                className="gap-2"
+                title={roundProgress < 100 ? "Complete all matches first" : ""}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Next Round
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setShowEndTournamentDialog(true)}
                 className="gap-2"
               >
-                <Shuffle className="h-4 w-4" />
-                Next Round
+                <Flag className="h-4 w-4" />
+                End
               </Button>
             </div>
           </div>
@@ -468,7 +579,7 @@ export const MultiGameMatchesTab = ({
                                     min="1"
                                     max={participants.length}
                                     className="text-center"
-                                    placeholder={mp.placement?.toString() || ""}
+                                    placeholder={mp.placement?.toString() || "-"}
                                     value={currentScore?.placement ?? ""}
                                     onChange={(e) => {
                                       const placement = parseInt(e.target.value) || 1;
@@ -487,17 +598,18 @@ export const MultiGameMatchesTab = ({
                                     }}
                                     disabled={match.status === "completed"}
                                   />
-                                  <div className="text-center text-sm">
+                                  <div className="text-center text-muted-foreground">
                                     {currentScore?.tournamentPoints ?? mp.tournament_points ?? 0}
                                   </div>
                                 </div>
                               );
                             })}
+                            
                             {match.status !== "completed" && (
                               <Button
+                                className="w-full mt-4"
                                 onClick={() => updateMatchScores(match.id)}
                                 disabled={!scores[match.id]}
-                                className="w-full mt-2"
                               >
                                 Save Scores
                               </Button>
@@ -528,8 +640,7 @@ export const MultiGameMatchesTab = ({
         open={showQRDialog}
         onOpenChange={setShowQRDialog}
         checkInToken={checkInToken || ""}
-        round={selectedRound}
-        tournamentName={tournamentName}
+        tournamentName={tournamentName || ""}
       />
 
       <GameConfigDialog
@@ -538,6 +649,21 @@ export const MultiGameMatchesTab = ({
         tournamentId={tournamentId}
         onGamesUpdated={fetchGames}
       />
+
+      <AlertDialog open={showEndTournamentDialog} onOpenChange={setShowEndTournamentDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End Tournament?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the tournament as finished. The leaderboard will be locked and no more rounds can be generated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={endTournament}>End Tournament</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

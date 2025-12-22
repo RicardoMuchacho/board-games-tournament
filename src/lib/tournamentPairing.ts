@@ -345,10 +345,13 @@ export function generateMultiGamePairings(
   const result: { gameId: string; tables: Participant[][] }[] = [];
   const availablePlayers = [...participants];
   
-  // Sort games by capacity (prioritize games with more capacity)
-  const sortedGames = [...games].sort((a, b) => 
-    (b.available_tables * b.players_per_table) - (a.available_tables * a.players_per_table)
-  );
+  // Sort games by order_index to respect configured order
+  const sortedGames = [...games].sort((a, b) => {
+    // If games have order_index (from DB), use that
+    const aOrder = (a as any).order_index ?? 0;
+    const bOrder = (b as any).order_index ?? 0;
+    return aOrder - bOrder;
+  });
   
   // For each participant, calculate game priority (games they haven't played)
   const getGamePriority = (playerId: string, gameId: string): number => {
@@ -379,24 +382,16 @@ export function generateMultiGamePairings(
     return score;
   };
   
-  // Assign players to each game
+  // Assign players to each game - strictly respect available_tables limit
   for (const game of sortedGames) {
     if (availablePlayers.length < game.min_players) continue;
     
     const gameTables: Participant[][] = [];
-    const { tableSizes } = calculateTableDistribution(
-      Math.min(availablePlayers.length, game.available_tables * game.players_per_table),
-      game.players_per_table,
-      game.min_players
-    );
     
-    const maxTables = Math.min(game.available_tables, tableSizes.length);
-    
-    for (let tableIdx = 0; tableIdx < maxTables && availablePlayers.length >= game.min_players; tableIdx++) {
-      const tableSize = Math.min(
-        game.players_per_table,
-        availablePlayers.length
-      );
+    // Strictly limit to available_tables
+    for (let tableIdx = 0; tableIdx < game.available_tables && availablePlayers.length >= game.min_players; tableIdx++) {
+      // Determine table size - use players_per_table but allow min_players if not enough
+      const tableSize = Math.min(game.players_per_table, availablePlayers.length);
       
       if (tableSize < game.min_players) break;
       

@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, Edit, Save, X, Loader2 } from "lucide-react";
+import { Plus, Trash2, Edit, Save, X, Loader2, AlertTriangle, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Game {
   id: string;
@@ -33,6 +34,7 @@ export const GameConfigDialog = ({
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingGame, setEditingGame] = useState<string | null>(null);
+  const [checkedInCount, setCheckedInCount] = useState(0);
   const [newGame, setNewGame] = useState({
     name: "",
     available_tables: 1,
@@ -44,6 +46,7 @@ export const GameConfigDialog = ({
   useEffect(() => {
     if (open && tournamentId) {
       fetchGames();
+      fetchCheckedInCount();
     }
   }, [open, tournamentId]);
 
@@ -64,6 +67,43 @@ export const GameConfigDialog = ({
       setLoading(false);
     }
   };
+
+  const fetchCheckedInCount = async () => {
+    const { data, error } = await supabase
+      .from("participants")
+      .select("id", { count: "exact" })
+      .eq("tournament_id", tournamentId)
+      .eq("checked_in", true);
+
+    if (!error && data) {
+      setCheckedInCount(data.length);
+    }
+  };
+
+  const totalCapacity = games.reduce(
+    (sum, game) => sum + game.available_tables * game.players_per_table,
+    0
+  );
+
+  const capacityStatus = (): { type: "success" | "warning" | "error"; message: string } => {
+    if (checkedInCount === 0) {
+      return { type: "warning", message: "No participants checked in yet" };
+    }
+    if (totalCapacity === 0) {
+      return { type: "error", message: `Need capacity for ${checkedInCount} participants` };
+    }
+    if (totalCapacity < checkedInCount) {
+      const missing = checkedInCount - totalCapacity;
+      return { type: "error", message: `Insufficient capacity: need ${missing} more slots` };
+    }
+    if (totalCapacity > checkedInCount * 1.5) {
+      const excess = totalCapacity - checkedInCount;
+      return { type: "warning", message: `Excess capacity: ${excess} unused slots` };
+    }
+    return { type: "success", message: `Capacity covers all ${checkedInCount} participants` };
+  };
+
+  const status = capacityStatus();
 
   const addGame = async () => {
     if (!newGame.name.trim()) {
@@ -145,11 +185,6 @@ export const GameConfigDialog = ({
     setEditValues({});
   };
 
-  const totalCapacity = games.reduce(
-    (sum, game) => sum + game.available_tables * game.players_per_table,
-    0
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -163,6 +198,21 @@ export const GameConfigDialog = ({
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Capacity Status Alert */}
+            <Alert variant={status.type === "error" ? "destructive" : "default"}>
+              {status.type === "success" ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )}
+              <AlertDescription className="flex items-center justify-between">
+                <span>{status.message}</span>
+                <span className="font-medium">
+                  {totalCapacity} / {checkedInCount} participants
+                </span>
+              </AlertDescription>
+            </Alert>
+
             {/* Add new game form */}
             <Card>
               <CardContent className="pt-6">
