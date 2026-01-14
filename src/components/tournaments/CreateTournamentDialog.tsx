@@ -11,7 +11,7 @@ import { z } from "zod";
 
 const tournamentSchema = z.object({
   name: z.string().trim().min(3, "Name must be at least 3 characters").max(100, "Name must be less than 100 characters"),
-  type: z.enum(["swiss", "eliminatory", "round_robin", "catan", "multigame"]),
+  type: z.enum(["swiss", "eliminatory", "round_robin", "catan", "multigame", "carcassonne"]),
   number_of_participants: z.number().min(2).max(100).optional(),
   number_of_rounds: z.number().min(1).max(50).optional(),
   match_generation_mode: z.enum(["auto", "manual"]),
@@ -26,7 +26,7 @@ interface CreateTournamentDialogProps {
 export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState<"swiss" | "eliminatory" | "round_robin" | "catan" | "multigame">("swiss");
+  const [type, setType] = useState<"swiss" | "eliminatory" | "round_robin" | "catan" | "multigame" | "carcassonne">("swiss");
   const [numberOfParticipants, setNumberOfParticipants] = useState<number | undefined>(undefined);
   const [numberOfRounds, setNumberOfRounds] = useState<number | undefined>(undefined);
   const [matchGenerationMode, setMatchGenerationMode] = useState<"auto" | "manual">("auto");
@@ -126,6 +126,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
                 <SelectItem value="round_robin">Round Robin</SelectItem>
                 <SelectItem value="catan">Catan</SelectItem>
                 <SelectItem value="multigame">Multi-Game</SelectItem>
+                <SelectItem value="carcassonne">Carcassonne (1v1)</SelectItem>
               </SelectContent>
             </Select>
           </div>
