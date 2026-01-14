@@ -123,6 +123,13 @@ const MatchResults = () => {
         toast.error("Please enter placement for all players");
         return;
       }
+    } else {
+      // For non-Catan tournaments, ensure a winner is selected
+      const hasWinner = resultEntries.some(([, r]) => r.placement === 1);
+      if (!hasWinner) {
+        toast.error("Please select a winner");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -289,26 +296,54 @@ const MatchResults = () => {
                       </div>
                     </div>
                   ) : (
-                    <div>
-                      <label className="text-sm text-muted-foreground">Score</label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={results[mp.participant.id]?.score ?? ""}
-                        onChange={(e) => {
-                          const score = parseInt(e.target.value) || 0;
-                          setResults(prev => ({
-                            ...prev,
-                            [mp.participant.id]: {
-                              ...prev[mp.participant.id],
-                              score,
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm text-muted-foreground">Score</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={results[mp.participant.id]?.score ?? ""}
+                          onChange={(e) => {
+                            const score = parseInt(e.target.value) || 0;
+                            setResults(prev => ({
+                              ...prev,
+                              [mp.participant.id]: {
+                                ...prev[mp.participant.id],
+                                score,
+                                victoryPoints: 0,
+                                placement: prev[mp.participant.id]?.placement || 0,
+                                tournamentPoints: 0,
+                              },
+                            }));
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Set this participant as winner (placement 1), others as losers (placement 2)
+                          const newResults: typeof results = {};
+                          participants.forEach((p) => {
+                            const isWinner = p.participant.id === mp.participant.id;
+                            newResults[p.participant.id] = {
+                              ...results[p.participant.id],
+                              score: results[p.participant.id]?.score || 0,
                               victoryPoints: 0,
-                              placement: 0,
+                              placement: isWinner ? 1 : 2,
                               tournamentPoints: 0,
-                            },
-                          }));
+                            };
+                          });
+                          setResults(newResults);
                         }}
-                      />
+                        className={`w-full py-2 px-4 rounded-lg border-2 transition-colors flex items-center justify-center gap-2 ${
+                          results[mp.participant.id]?.placement === 1
+                            ? "border-primary bg-primary/20 text-primary"
+                            : "border-muted hover:border-primary/50 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Trophy className="h-4 w-4" />
+                        {results[mp.participant.id]?.placement === 1 ? "Winner" : "Select as Winner"}
+                      </button>
                     </div>
                   )}
                 </div>
