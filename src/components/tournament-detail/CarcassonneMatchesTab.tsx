@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit, Shuffle, QrCode, Crown } from "lucide-react";
+import { Search, Edit, Shuffle, QrCode, Crown, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { EditMatchParticipants } from "./EditMatchParticipants";
 import { RoundQRDialog } from "./RoundQRDialog";
@@ -130,13 +130,82 @@ export const CarcassonneMatchesTab = ({
     });
   };
 
-  const generateCarcassonnePairings = async () => {
-    // Check if matches already exist
-    if (matches.length > 0) {
-      toast.error("Matches already generated. Delete existing matches to regenerate.");
+  const clearResult = async (matchId: string) => {
+    const { error } = await supabase
+      .from("matches")
+      .update({
+        player1_score: 0,
+        player2_score: 0,
+        winner_id: null,
+        status: "pending",
+      })
+      .eq("id", matchId);
+
+    if (error) {
+      toast.error("Failed to clear result");
       return;
     }
 
+    toast.success("Result cleared");
+    fetchMatches();
+  };
+
+  // Build pairing history from existing matches
+  const buildPairingHistory = (): Map<string, Set<string>> => {
+    const history = new Map<string, Set<string>>();
+    for (const match of matches) {
+      if (match.player1_id && match.player2_id) {
+        if (!history.has(match.player1_id)) history.set(match.player1_id, new Set());
+        if (!history.has(match.player2_id)) history.set(match.player2_id, new Set());
+        history.get(match.player1_id)!.add(match.player2_id);
+        history.get(match.player2_id)!.add(match.player1_id);
+      }
+    }
+    return history;
+  };
+
+  // Check if two players have played before
+  const havePlayed = (p1Id: string, p2Id: string, history: Map<string, Set<string>>): boolean => {
+    return history.get(p1Id)?.has(p2Id) || false;
+  };
+
+  // Calculate player standings from completed matches
+  const calculateStandings = (): Map<string, { wins: number; pointDiff: number }> => {
+    const standings = new Map<string, { wins: number; pointDiff: number }>();
+    
+    // Initialize all participants
+    for (const p of participants) {
+      standings.set(p.id, { wins: 0, pointDiff: 0 });
+    }
+    
+    // Calculate from completed matches
+    for (const match of matches) {
+      if (match.status !== "completed" || !match.player1_id || !match.player2_id) continue;
+      
+      const p1Score = match.player1_score || 0;
+      const p2Score = match.player2_score || 0;
+      const diff = p1Score - p2Score;
+      
+      const p1Stats = standings.get(match.player1_id) || { wins: 0, pointDiff: 0 };
+      const p2Stats = standings.get(match.player2_id) || { wins: 0, pointDiff: 0 };
+      
+      p1Stats.pointDiff += diff;
+      p2Stats.pointDiff -= diff;
+      
+      if (match.winner_id === match.player1_id) {
+        p1Stats.wins += 1;
+      } else if (match.winner_id === match.player2_id) {
+        p2Stats.wins += 1;
+      }
+      
+      standings.set(match.player1_id, p1Stats);
+      standings.set(match.player2_id, p2Stats);
+    }
+    
+    return standings;
+  };
+
+  const generateRound1 = async () => {
     if (participants.length < 2) {
       toast.error("Need at least 2 participants");
       return;
@@ -144,56 +213,133 @@ export const CarcassonneMatchesTab = ({
 
     setGeneratingRound(true);
     try {
-      // Generate round robin pairings - each participant plays everyone once
+      const shuffled = [...participants].sort(() => Math.random() - 0.5);
       const newMatches: any[] = [];
-      const participantsList = [...participants];
-      const n = participantsList.length;
       
-      // If odd number, add a "bye" placeholder
-      const hasBye = n % 2 === 1;
-      if (hasBye) {
-        participantsList.push({ id: null, name: "BYE" });
+      for (let i = 0; i < shuffled.length - 1; i += 2) {
+        newMatches.push({
+          tournament_id: tournamentId,
+          round: 1,
+          player1_id: shuffled[i].id,
+          player2_id: shuffled[i + 1].id,
+          status: "pending",
+        });
       }
       
-      const numRounds = participantsList.length - 1;
-      const half = participantsList.length / 2;
-      
-      // Standard round robin algorithm
-      const players = [...participantsList];
-      const fixed = players.shift()!; // Fix first player
-      
-      for (let round = 1; round <= numRounds; round++) {
-        const roundPlayers = [fixed, ...players];
-        
-        for (let i = 0; i < half; i++) {
-          const p1 = roundPlayers[i];
-          const p2 = roundPlayers[roundPlayers.length - 1 - i];
-          
-          // Skip matches with BYE
-          if (p1.id && p2.id) {
-            newMatches.push({
-              tournament_id: tournamentId,
-              round: round,
-              player1_id: p1.id,
-              player2_id: p2.id,
-              status: "pending",
-            });
-          }
-        }
-        
-        // Rotate players (except fixed)
-        players.push(players.shift()!);
+      // Handle odd player with bye (skip match)
+      if (shuffled.length % 2 === 1) {
+        toast.info(`${shuffled[shuffled.length - 1].name} gets a bye this round`);
       }
 
       const { error } = await supabase.from("matches").insert(newMatches);
       if (error) throw error;
 
-      toast.success(`Generated ${newMatches.length} matches across ${numRounds} rounds`);
+      toast.success(`Generated ${newMatches.length} matches for Round 1`);
+      fetchMatches();
     } catch (error: any) {
       toast.error("Failed to generate matches: " + error.message);
     } finally {
       setGeneratingRound(false);
     }
+  };
+
+  const generateNextRound = async () => {
+    const currentMaxRound = rounds.length > 0 ? Math.max(...rounds) : 0;
+    const currentRoundMatchesList = groupedMatches[currentMaxRound] || [];
+    
+    // Check all current round matches are completed
+    const pendingMatches = currentRoundMatchesList.filter((m: any) => m.status !== "completed");
+    if (pendingMatches.length > 0) {
+      toast.error("Complete all matches in the current round first");
+      return;
+    }
+
+    setGeneratingRound(true);
+    try {
+      const standings = calculateStandings();
+      const history = buildPairingHistory();
+      const nextRound = currentMaxRound + 1;
+      
+      // Sort players by wins (desc), then point differential (desc)
+      const sortedPlayers = [...participants].sort((a, b) => {
+        const aStats = standings.get(a.id) || { wins: 0, pointDiff: 0 };
+        const bStats = standings.get(b.id) || { wins: 0, pointDiff: 0 };
+        if (bStats.wins !== aStats.wins) return bStats.wins - aStats.wins;
+        return bStats.pointDiff - aStats.pointDiff;
+      });
+
+      const paired = new Set<string>();
+      const newMatches: any[] = [];
+
+      // Swiss pairing: try to pair adjacent players in standings who haven't played
+      for (let i = 0; i < sortedPlayers.length; i++) {
+        const p1 = sortedPlayers[i];
+        if (paired.has(p1.id)) continue;
+
+        // Find best opponent (closest in standings, hasn't played p1)
+        let bestOpponent = null;
+        for (let j = i + 1; j < sortedPlayers.length; j++) {
+          const p2 = sortedPlayers[j];
+          if (paired.has(p2.id)) continue;
+          if (!havePlayed(p1.id, p2.id, history)) {
+            bestOpponent = p2;
+            break;
+          }
+        }
+
+        // If no unpaired opponent found, allow repeat (but try to avoid)
+        if (!bestOpponent) {
+          for (let j = i + 1; j < sortedPlayers.length; j++) {
+            const p2 = sortedPlayers[j];
+            if (!paired.has(p2.id)) {
+              bestOpponent = p2;
+              break;
+            }
+          }
+        }
+
+        if (bestOpponent) {
+          newMatches.push({
+            tournament_id: tournamentId,
+            round: nextRound,
+            player1_id: p1.id,
+            player2_id: bestOpponent.id,
+            status: "pending",
+          });
+          paired.add(p1.id);
+          paired.add(bestOpponent.id);
+        }
+      }
+
+      // Handle unpaired player (bye)
+      const unpairedPlayer = sortedPlayers.find(p => !paired.has(p.id));
+      if (unpairedPlayer) {
+        toast.info(`${unpairedPlayer.name} gets a bye this round`);
+      }
+
+      if (newMatches.length === 0) {
+        toast.error("Could not generate any matches for the next round");
+        return;
+      }
+
+      const { error } = await supabase.from("matches").insert(newMatches);
+      if (error) throw error;
+
+      setSelectedRound(nextRound);
+      toast.success(`Generated ${newMatches.length} matches for Round ${nextRound}`);
+      fetchMatches();
+    } catch (error: any) {
+      toast.error("Failed to generate matches: " + error.message);
+    } finally {
+      setGeneratingRound(false);
+    }
+  };
+
+  const canGenerateNextRound = () => {
+    if (rounds.length === 0) return false;
+    const currentMaxRound = Math.max(...rounds);
+    const currentRoundMatchesList = groupedMatches[currentMaxRound] || [];
+    return currentRoundMatchesList.every((m: any) => m.status === "completed");
   };
 
   const groupedMatches = matches.reduce((acc, match) => {
@@ -234,15 +380,15 @@ export const CarcassonneMatchesTab = ({
           <CardContent className="flex flex-col items-center justify-center h-48 space-y-4">
             <p className="text-muted-foreground">No matches yet</p>
             <p className="text-sm text-muted-foreground">
-              Generate round-robin pairings for Carcassonne tournament
+              Swiss pairing: winners face winners, losers face losers
             </p>
             <Button 
-              onClick={generateCarcassonnePairings} 
+              onClick={generateRound1} 
               disabled={generatingRound || participants.length < 2}
               className="gap-2"
             >
               <Shuffle className="h-4 w-4" />
-              Generate Matches
+              Generate Round 1
             </Button>
           </CardContent>
         </Card>
@@ -266,6 +412,16 @@ export const CarcassonneMatchesTab = ({
               >
                 <QrCode className="h-4 w-4" />
                 QR Results
+              </Button>
+            )}
+            {canGenerateNextRound() && (
+              <Button
+                onClick={generateNextRound}
+                disabled={generatingRound}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Generate Round {Math.max(...rounds) + 1}
               </Button>
             )}
           </div>
@@ -409,6 +565,18 @@ export const CarcassonneMatchesTab = ({
                         className="w-full"
                       >
                         Save Result
+                      </Button>
+                    )}
+
+                    {/* Clear Result Button for completed matches */}
+                    {match.status === "completed" && (
+                      <Button
+                        variant="outline"
+                        onClick={() => clearResult(match.id)}
+                        className="w-full gap-2 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Clear Result
                       </Button>
                     )}
                   </CardContent>
