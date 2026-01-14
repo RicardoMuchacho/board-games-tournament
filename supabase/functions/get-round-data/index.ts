@@ -90,9 +90,15 @@ Deno.serve(async (req) => {
     let matchParticipants: Record<string, any[]> = {};
 
     if (roundToFetch) {
+      // For 1v1 games (swiss, carcassonne, etc.), include player info directly
       const { data: roundMatches, error: roundMatchesError } = await supabase
         .from("matches")
-        .select("*, game:games(id, name)")
+        .select(`
+          *, 
+          game:games(id, name),
+          player1:participants!matches_player1_id_fkey(id, name),
+          player2:participants!matches_player2_id_fkey(id, name)
+        `)
         .eq("tournament_id", tournament.id)
         .eq("round", roundToFetch)
         .order("created_at");
@@ -107,7 +113,7 @@ Deno.serve(async (req) => {
 
       matches = roundMatches || [];
 
-      // Get match participants with participant names
+      // Get match participants with participant names (for multigame/catan)
       for (const match of matches) {
         const { data: mpData, error: mpError } = await supabase
           .from("match_participants")
@@ -117,8 +123,36 @@ Deno.serve(async (req) => {
           `)
           .eq("match_id", match.id);
 
-        if (!mpError && mpData) {
+        if (!mpError && mpData && mpData.length > 0) {
           matchParticipants[match.id] = mpData;
+        } else if (match.player1 || match.player2) {
+          // For 1v1 matches, create matchParticipants from player1/player2
+          const participants = [];
+          if (match.player1) {
+            participants.push({
+              id: `${match.id}-p1`,
+              match_id: match.id,
+              participant_id: match.player1.id,
+              victory_points: 0,
+              tournament_points: 0,
+              placement: null,
+              participant: match.player1,
+            });
+          }
+          if (match.player2) {
+            participants.push({
+              id: `${match.id}-p2`,
+              match_id: match.id,
+              participant_id: match.player2.id,
+              victory_points: 0,
+              tournament_points: 0,
+              placement: null,
+              participant: match.player2,
+            });
+          }
+          if (participants.length > 0) {
+            matchParticipants[match.id] = participants;
+          }
         }
       }
     }
