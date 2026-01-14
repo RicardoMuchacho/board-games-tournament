@@ -313,6 +313,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_carcassonne_tournament_standings: {
+        Args: { tournament_id_input: string }
+        Returns: {
+          draws: number
+          id: string
+          losses: number
+          matches_played: number
+          name: string
+          opponent_score: number
+          point_differential: number
+          total_score: number
+          tournament_id: string
+          wins: number
+        }[]
+      }
       get_catan_tournament_standings: {
         Args: { tournament_id_input: string }
         Returns: {
@@ -382,6 +397,7 @@ export type Database = {
         | "round_robin"
         | "catan"
         | "multigame"
+        | "carcassonne"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -517,6 +533,7 @@ export const Constants = {
         "round_robin",
         "catan",
         "multigame",
+        "carcassonne",
       ],
     },
   },
