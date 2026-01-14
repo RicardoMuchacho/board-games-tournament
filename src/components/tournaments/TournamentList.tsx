@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Copy, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { CopyTournamentDialog } from "./CopyTournamentDialog";
 
 export const TournamentList = () => {
   const navigate = useNavigate();
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [tournamentToCopy, setTournamentToCopy] = useState<any>(null);
 
   useEffect(() => {
     fetchTournaments();
@@ -60,58 +63,10 @@ export const TournamentList = () => {
     }
   };
 
-  const handleCopy = async (tournament: any, e: React.MouseEvent) => {
+  const handleCopy = (tournament: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Create new tournament with same format
-      const { data: newTournament, error: tournamentError } = await supabase
-        .from("tournaments")
-        .insert({
-          name: `${tournament.name} (Copy)`,
-          type: tournament.type,
-          number_of_participants: tournament.number_of_participants,
-          number_of_rounds: tournament.number_of_rounds,
-          players_per_match: tournament.players_per_match,
-          match_generation_mode: tournament.match_generation_mode,
-          created_by: user.id,
-        })
-        .select()
-        .single();
-
-      if (tournamentError) throw tournamentError;
-
-      // Fetch and copy participants
-      const { data: originalParticipants, error: participantsError } = await supabase
-        .from("participants")
-        .select("name, phone")
-        .eq("tournament_id", tournament.id);
-
-      if (participantsError) throw participantsError;
-
-      if (originalParticipants && originalParticipants.length > 0) {
-        const newParticipants = originalParticipants.map(p => ({
-          name: p.name,
-          phone: p.phone,
-          tournament_id: newTournament.id,
-          checked_in: false,
-        }));
-
-        const { error: insertError } = await supabase
-          .from("participants")
-          .insert(newParticipants);
-
-        if (insertError) throw insertError;
-      }
-
-      toast.success("Tournament copied successfully");
-    } catch (error: any) {
-      toast.error("Failed to copy tournament: " + error.message);
-    }
+    setTournamentToCopy(tournament);
+    setCopyDialogOpen(true);
   };
 
   if (loading) {
@@ -187,6 +142,12 @@ export const TournamentList = () => {
           </CardContent>
         </Card>
       ))}
+
+      <CopyTournamentDialog
+        open={copyDialogOpen}
+        onOpenChange={setCopyDialogOpen}
+        tournament={tournamentToCopy}
+      />
     </div>
   );
 };
