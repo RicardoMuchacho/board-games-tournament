@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Shuffle, Edit as EditIcon, CheckCircle2, Circle, QrCode, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { EditParticipantDialog } from "./EditParticipantDialog";
 import { CheckInQRDialog } from "./CheckInQRDialog";
 import { ExcelImportDialog } from "./ExcelImportDialog";
@@ -56,6 +57,8 @@ export const ParticipantsTab = ({
   const [editingParticipant, setEditingParticipant] = useState<{ id: string; name: string } | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [showExcelDialog, setShowExcelDialog] = useState(false);
+  const [showConfirmGenerate, setShowConfirmGenerate] = useState(false);
+  const [pendingNotCheckedIn, setPendingNotCheckedIn] = useState<any[]>([]);
 
   useEffect(() => {
     fetchParticipants();
@@ -211,11 +214,18 @@ export const ParticipantsTab = ({
 
     // Confirm deletion of non-checked-in participants
     if (notCheckedIn.length > 0) {
-      const confirmed = window.confirm(
-        `${notCheckedIn.length} participant(s) are not checked in and will be removed from the tournament. Continue?`
-      );
-      if (!confirmed) return;
+      setPendingNotCheckedIn(notCheckedIn);
+      setShowConfirmGenerate(true);
+      return;
     }
+
+    await executeGenerateMatches(checkedInParticipants, notCheckedIn);
+  };
+
+  const executeGenerateMatches = async (checkedInParticipants: any[], notCheckedIn: any[]) => {
+    const activeParticipants = checkedInParticipants;
+    const isManualMode = matchGenerationMode === "manual";
+    const rounds = numberOfRounds || 1;
 
     setLoading(true);
     try {
@@ -234,10 +244,6 @@ export const ParticipantsTab = ({
 
       const matches: any[] = [];
       const matchParticipants: any[] = [];
-      const rounds = numberOfRounds || 1;
-
-      // Use only checked-in participants for match generation
-      const activeParticipants = checkedInParticipants;
 
       if (isManualMode) {
         if (tournamentType === "catan") {
@@ -665,6 +671,28 @@ export const ParticipantsTab = ({
         maxParticipants={maxParticipants}
         currentCount={participants.length}
       />
+
+      <AlertDialog open={showConfirmGenerate} onOpenChange={setShowConfirmGenerate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove unchecked participants?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingNotCheckedIn.length} participant(s) are not checked in and will be permanently removed from the tournament.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const checkedIn = participants.filter(p => p.checked_in);
+                executeGenerateMatches(checkedIn, pendingNotCheckedIn);
+              }}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
