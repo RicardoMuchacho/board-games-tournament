@@ -96,93 +96,122 @@ export function calculateTableDistribution(
 }
 
 /**
- * Generate Catan pairings (3-4 players per match) with no repeats
+ * Assign players to tables for one round using backtracking.
+ * Falls back to greedy with minimum conflicts when no conflict-free solution exists.
+ */
+function assignRound(
+  players: Participant[],
+  tableSizes: number[],
+  history: PairingHistory
+): Participant[][] {
+  // Sort players by most constrained first (most previous opponents)
+  const sorted = [...players].sort((a, b) =>
+    history[b.id].size - history[a.id].size
+  );
+
+  const tables: Participant[][] = tableSizes.map(() => []);
+
+  function countConflicts(player: Participant, table: Participant[]): number {
+    let c = 0;
+    for (const p of table) {
+      if (history[player.id].has(p.id)) c++;
+    }
+    return c;
+  }
+
+  // Try backtracking for a conflict-free solution
+  let attempts = 0;
+  const maxAttempts = 50000;
+
+  function backtrack(idx: number): boolean {
+    if (++attempts > maxAttempts) return false;
+    if (idx >= sorted.length) return true;
+
+    const player = sorted[idx];
+    const triedSigs = new Set<string>();
+
+    for (let t = 0; t < tables.length; t++) {
+      if (tables[t].length >= tableSizes[t]) continue;
+      if (countConflicts(player, tables[t]) > 0) continue;
+
+      // Symmetry breaking: skip equivalent empty tables of the same size
+      if (tables[t].length === 0) {
+        const sig = String(tableSizes[t]);
+        if (triedSigs.has(sig)) continue;
+        triedSigs.add(sig);
+      }
+
+      tables[t].push(player);
+      if (backtrack(idx + 1)) return true;
+      tables[t].pop();
+    }
+
+    return false;
+  }
+
+  if (backtrack(0)) return tables;
+
+  // Fallback: greedy assignment minimizing conflicts (for when repeats are unavoidable)
+  const greedyTables: Participant[][] = tableSizes.map(() => []);
+
+  for (const player of sorted) {
+    let bestTable = -1;
+    let bestConflicts = Infinity;
+    let bestFill = Infinity;
+
+    for (let t = 0; t < greedyTables.length; t++) {
+      if (greedyTables[t].length >= tableSizes[t]) continue;
+      const c = countConflicts(player, greedyTables[t]);
+      const fill = greedyTables[t].length;
+
+      if (c < bestConflicts || (c === bestConflicts && fill < bestFill)) {
+        bestConflicts = c;
+        bestFill = fill;
+        bestTable = t;
+      }
+    }
+
+    if (bestTable >= 0) {
+      greedyTables[bestTable].push(player);
+    }
+  }
+
+  return greedyTables;
+}
+
+/**
+ * Generate Catan pairings (3-4 players per match) with no repeats.
+ * Uses backtracking to find conflict-free assignments per round.
+ * When repeats are unavoidable (few players, many rounds), minimizes them.
  */
 export function generateCatanPairings(
   participants: Participant[],
   rounds: number
 ): Participant[][][] {
-  const allRoundMatches: Participant[][][] = [];
   const history: PairingHistory = {};
-  
-  // Initialize history
-  participants.forEach(p => {
-    history[p.id] = new Set<string>();
-  });
-  
-  // Calculate optimal table distribution
+  participants.forEach(p => { history[p.id] = new Set<string>(); });
+
   const { tableSizes } = calculateTableDistribution(participants.length, 4, 3);
-  
-  for (let round = 1; round <= rounds; round++) {
-    const roundMatches: Participant[][] = [];
-    const availablePlayers = [...participants];
-    let tableIndex = 0;
-    let attempts = 0;
-    const maxAttempts = 1000;
-    
-    while (availablePlayers.length >= 3 && tableIndex < tableSizes.length && attempts < maxAttempts) {
-      attempts++;
-      
-      // Use pre-calculated table size for this table
-      const matchSize = tableSizes[tableIndex];
-      let bestMatch: Participant[] | null = null;
-      let minConflicts = Infinity;
-      
-      // Try multiple random combinations to find one with fewest conflicts
-      for (let trial = 0; trial < 50; trial++) {
-        const shuffled = [...availablePlayers].sort(() => Math.random() - 0.5);
-        const candidate = shuffled.slice(0, matchSize);
-        
-        // Count how many pairs have already played
-        let conflicts = 0;
-        for (let i = 0; i < candidate.length; i++) {
-          for (let j = i + 1; j < candidate.length; j++) {
-            if (history[candidate[i].id].has(candidate[j].id)) {
-              conflicts++;
-            }
-          }
+  if (tableSizes.length === 0) return [];
+
+  const allRoundMatches: Participant[][][] = [];
+
+  for (let round = 0; round < rounds; round++) {
+    const assignment = assignRound(participants, tableSizes, history);
+
+    // Update history with new pairings
+    for (const table of assignment) {
+      for (let i = 0; i < table.length; i++) {
+        for (let j = i + 1; j < table.length; j++) {
+          history[table[i].id].add(table[j].id);
+          history[table[j].id].add(table[i].id);
         }
-        
-        if (conflicts < minConflicts) {
-          minConflicts = conflicts;
-          bestMatch = candidate;
-          
-          // If we found a perfect match (no conflicts), use it immediately
-          if (conflicts === 0) break;
-        }
-      }
-      
-      // Only accept matches with conflicts if we've tried many times
-      if (bestMatch && (minConflicts === 0 || attempts > 50)) {
-        roundMatches.push(bestMatch);
-        tableIndex++;
-        
-        // Update history
-        for (let i = 0; i < bestMatch.length; i++) {
-          for (let j = i + 1; j < bestMatch.length; j++) {
-            history[bestMatch[i].id].add(bestMatch[j].id);
-            history[bestMatch[j].id].add(bestMatch[i].id);
-          }
-        }
-        
-        // Remove matched players from available pool
-        bestMatch.forEach(player => {
-          const index = availablePlayers.findIndex(p => p.id === player.id);
-          if (index !== -1) {
-            availablePlayers.splice(index, 1);
-          }
-        });
-        
-        attempts = 0; // Reset attempts counter on success
-      } else if (!bestMatch) {
-        // If we couldn't find any match, break to prevent infinite loop
-        break;
       }
     }
-    
-    allRoundMatches.push(roundMatches);
+
+    allRoundMatches.push(assignment);
   }
-  
+
   return allRoundMatches;
 }
 

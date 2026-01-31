@@ -4,11 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Edit, Plus, Shuffle, QrCode } from "lucide-react";
+import { Search, Edit, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { EditCatanMatchParticipants } from "./EditCatanMatchParticipants";
 import { RoundQRDialog } from "./RoundQRDialog";
-import { generateCatanPairings, calculateTableDistribution } from "@/lib/tournamentPairing";
 
 interface CatanMatchesTabProps {
   tournamentId: string;
@@ -19,7 +18,6 @@ interface CatanMatchesTabProps {
 
 export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, tournamentName }: CatanMatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
-  const [participants, setParticipants] = useState<any[]>([]);
   const [matchParticipants, setMatchParticipants] = useState<{ [key: string]: any[] }>({});
   const [scores, setScores] = useState<{ 
     [matchId: string]: { 
@@ -33,12 +31,10 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMatch, setEditingMatch] = useState<{ id: string; participantIds: string[] } | null>(null);
-  const [generatingRound, setGeneratingRound] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
 
   useEffect(() => {
     fetchMatches();
-    fetchParticipants();
 
     const matchesChannel = supabase
       .channel(`catan-matches-${tournamentId}`)
@@ -67,17 +63,6 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
       supabase.removeChannel(participantsChannel);
     };
   }, [tournamentId]);
-
-  const fetchParticipants = async () => {
-    const { data, error } = await supabase
-      .from("participants")
-      .select("*")
-      .eq("tournament_id", tournamentId);
-    
-    if (!error && data) {
-      setParticipants(data);
-    }
-  };
 
   const fetchMatches = async () => {
     const { data: matchesData, error: matchesError } = await supabase
@@ -189,126 +174,6 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
     return points[placement] || 0;
   };
 
-  const generateNextRound = async (mode: "auto" | "manual") => {
-    const nextRound = rounds.length > 0 ? Math.max(...rounds) + 1 : 1;
-    
-    if (numberOfRounds && nextRound > numberOfRounds) {
-      toast.error(`Maximum rounds (${numberOfRounds}) reached`);
-      return;
-    }
-
-    if (participants.length < 3) {
-      toast.error("Need at least 3 participants");
-      return;
-    }
-
-    setGeneratingRound(true);
-    try {
-      const newMatches: any[] = [];
-      const newMatchParticipants: any[] = [];
-
-      if (mode === "auto") {
-        // Build existing pairings history from all existing matches
-        const existingMatchIds = matches.map(m => m.id);
-        let existingPairings: any[][] = [];
-        
-        if (existingMatchIds.length > 0) {
-          const allParticipants = Object.values(matchParticipants).flat();
-          const matchGroups: { [key: string]: string[] } = {};
-          allParticipants.forEach((mp: any) => {
-            if (!matchGroups[mp.match_id]) matchGroups[mp.match_id] = [];
-            matchGroups[mp.match_id].push(mp.participant_id);
-          });
-
-          existingPairings = Object.values(matchGroups).map(participantIds =>
-            participantIds.map(id => participants.find(p => p.id === id)).filter(Boolean)
-          );
-        }
-
-        // Generate one round of smart pairings
-        const allRoundMatches = generateCatanPairings(participants, nextRound);
-        const roundMatches = allRoundMatches[nextRound - 1] || [];
-
-        for (const matchPlayers of roundMatches) {
-          newMatches.push({
-            tournament_id: tournamentId,
-            round: nextRound,
-            player1_id: matchPlayers[0]?.id,
-            player2_id: matchPlayers[1]?.id,
-            player3_id: matchPlayers[2]?.id,
-            player4_id: matchPlayers[3]?.id || null,
-            status: "pending",
-          });
-        }
-
-        const { data: insertedMatches, error: matchError } = await supabase
-          .from("matches")
-          .insert(newMatches)
-          .select();
-
-        if (matchError) throw matchError;
-
-        if (insertedMatches) {
-          for (let i = 0; i < insertedMatches.length; i++) {
-            const match = insertedMatches[i];
-            const matchPlayers = roundMatches[i] || [];
-            
-            for (const player of matchPlayers) {
-              newMatchParticipants.push({
-                match_id: match.id,
-                participant_id: player.id,
-                victory_points: 0,
-                tournament_points: 0,
-              });
-            }
-          }
-
-          if (newMatchParticipants.length > 0) {
-            // @ts-ignore
-            const { error: mpError } = await (supabase as any)
-              .from("match_participants")
-              .insert(newMatchParticipants);
-            if (mpError) throw mpError;
-          }
-        }
-
-        toast.success(`Round ${nextRound} generated with smart pairing`);
-      } else {
-        // Manual mode: create blank matches with smart distribution
-        const { tableSizes } = calculateTableDistribution(participants.length, 4, 3);
-        const tablesNeeded = tableSizes.length;
-        
-        for (let i = 0; i < tablesNeeded; i++) {
-          newMatches.push({
-            tournament_id: tournamentId,
-            round: nextRound,
-            player1_id: null,
-            player2_id: null,
-            player3_id: null,
-            player4_id: null,
-            status: "pending",
-          });
-        }
-
-        const { error } = await supabase.from("matches").insert(newMatches);
-        if (error) throw error;
-
-        const tablesOf4 = tableSizes.filter(s => s === 4).length;
-        const tablesOf3 = tableSizes.filter(s => s === 3).length;
-        const distribution = tablesOf3 > 0 
-          ? `(${tablesOf4} tables of 4, ${tablesOf3} tables of 3)` 
-          : '';
-        toast.success(`Round ${nextRound} created with ${tablesNeeded} blank tables ${distribution}`);
-      }
-
-      setSelectedRound(nextRound);
-    } catch (error: any) {
-      toast.error("Failed to generate round: " + error.message);
-    } finally {
-      setGeneratingRound(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {rounds.length === 0 ? (
@@ -332,36 +197,16 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
                 Round {round}
               </Button>
             ))}
-            <div className="flex gap-2 ml-auto">
-              {checkInToken && (
-                <Button
-                  variant="outline"
-                  onClick={() => setShowQRDialog(true)}
-                  className="gap-2"
-                >
-                  <QrCode className="h-4 w-4" />
-                  QR Results
-                </Button>
-              )}
+            {checkInToken && (
               <Button
                 variant="outline"
-                onClick={() => generateNextRound("auto")}
-                disabled={generatingRound}
-                className="gap-2"
+                onClick={() => setShowQRDialog(true)}
+                className="gap-2 ml-auto"
               >
-                <Shuffle className="h-4 w-4" />
-                Auto Next Round
+                <QrCode className="h-4 w-4" />
+                QR Results
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => generateNextRound("manual")}
-                disabled={generatingRound}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Manual Next Round
-              </Button>
-            </div>
+            )}
           </div>
 
           <div className="relative">

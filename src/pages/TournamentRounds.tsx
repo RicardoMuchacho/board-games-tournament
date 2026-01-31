@@ -6,8 +6,6 @@ import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CatanMatchesTab } from "@/components/tournament-detail/CatanMatchesTab";
-import { MatchesTab } from "@/components/tournament-detail/MatchesTab";
 
 const TournamentRounds = () => {
   const { id } = useParams();
