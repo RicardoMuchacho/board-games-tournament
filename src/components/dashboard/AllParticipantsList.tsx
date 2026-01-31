@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,7 +15,6 @@ interface Participant {
 }
 
 export function AllParticipantsList() {
-  const navigate = useNavigate();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -220,8 +218,7 @@ export function AllParticipantsList() {
               {participants.map((participant, index) => (
                 <TableRow 
                   key={participant.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/participant/${participant.id}`)}
+                  className=""
                 >
                   <TableCell className="font-medium text-muted-foreground">
                     {index + 1}

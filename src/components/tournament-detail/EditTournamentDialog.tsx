@@ -12,6 +12,7 @@ import { generateSwissPairings, generateCatanPairings } from "@/lib/tournamentPa
 const tournamentEditSchema = z.object({
   name: z.string().trim().min(3, "Name must be at least 3 characters").max(100, "Name must be less than 100 characters"),
   number_of_rounds: z.number().int().min(1, "Must have at least 1 round").max(100, "Maximum 100 rounds"),
+  number_of_participants: z.number().int().min(2, "Must have at least 2 participants").max(100, "Maximum 100 participants").optional(),
 });
 
 interface EditTournamentDialogProps {
@@ -20,6 +21,7 @@ interface EditTournamentDialogProps {
   tournamentId: string;
   currentName: string;
   currentNumberOfRounds: number;
+  currentNumberOfParticipants?: number;
   tournamentType: string;
   playersPerMatch: number;
   onUpdate: () => void;
@@ -31,25 +33,29 @@ export const EditTournamentDialog = ({
   tournamentId,
   currentName,
   currentNumberOfRounds,
+  currentNumberOfParticipants,
   tournamentType,
   playersPerMatch,
   onUpdate,
 }: EditTournamentDialogProps) => {
   const [name, setName] = useState(currentName);
   const [numberOfRounds, setNumberOfRounds] = useState(currentNumberOfRounds);
+  const [numberOfParticipants, setNumberOfParticipants] = useState<number | undefined>(currentNumberOfParticipants);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
       setName(currentName);
       setNumberOfRounds(currentNumberOfRounds);
+      setNumberOfParticipants(currentNumberOfParticipants);
     }
-  }, [open, currentName, currentNumberOfRounds]);
+  }, [open, currentName, currentNumberOfRounds, currentNumberOfParticipants]);
 
   const handleSave = async () => {
-    const validation = tournamentEditSchema.safeParse({ 
-      name, 
-      number_of_rounds: numberOfRounds 
+    const validation = tournamentEditSchema.safeParse({
+      name,
+      number_of_rounds: numberOfRounds,
+      number_of_participants: numberOfParticipants,
     });
     if (!validation.success) {
       toast.error(validation.error.errors[0].message);
@@ -61,9 +67,10 @@ export const EditTournamentDialog = ({
       // Update tournament
       const { error: updateError } = await supabase
         .from("tournaments")
-        .update({ 
+        .update({
           name: validation.data.name,
-          number_of_rounds: validation.data.number_of_rounds
+          number_of_rounds: validation.data.number_of_rounds,
+          number_of_participants: validation.data.number_of_participants ?? null,
         })
         .eq("id", tournamentId);
 
@@ -218,6 +225,18 @@ export const EditTournamentDialog = ({
                 Increasing rounds will generate {numberOfRounds - currentNumberOfRounds} new round(s) following tournament rules
               </p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="participants">Number of Participants (Optional)</Label>
+            <Input
+              id="participants"
+              type="number"
+              min="2"
+              max="100"
+              placeholder="e.g., 16"
+              value={numberOfParticipants || ""}
+              onChange={(e) => setNumberOfParticipants(e.target.value ? parseInt(e.target.value) : undefined)}
+            />
           </div>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

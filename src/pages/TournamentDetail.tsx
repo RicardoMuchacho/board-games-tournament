@@ -142,6 +142,7 @@ const TournamentDetail = () => {
           tournamentId={id!}
           currentName={tournament.name}
           currentNumberOfRounds={tournament.number_of_rounds}
+          currentNumberOfParticipants={tournament.number_of_participants}
           tournamentType={tournament.type}
           playersPerMatch={tournament.players_per_match}
           onUpdate={fetchTournament}

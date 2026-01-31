@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -25,7 +24,6 @@ interface Standing {
 }
 
 export const CarcassonneLeaderboardTab = ({ tournamentId }: CarcassonneLeaderboardTabProps) => {
-  const navigate = useNavigate();
   const [standings, setStandings] = useState<Standing[]>([]);
 
   useEffect(() => {
@@ -128,8 +126,7 @@ export const CarcassonneLeaderboardTab = ({ tournamentId }: CarcassonneLeaderboa
               {standings.map((standing, index) => (
                 <TableRow 
                   key={standing.id} 
-                  className={`${index < 3 ? "bg-muted/30" : ""} cursor-pointer hover:bg-accent/50 transition-colors`}
-                  onClick={() => navigate(`/participant/${standing.id}`)}
+                  className={`${index < 3 ? "bg-muted/30" : ""}`}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">

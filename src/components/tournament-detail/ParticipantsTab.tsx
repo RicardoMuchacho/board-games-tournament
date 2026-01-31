@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +48,6 @@ export const ParticipantsTab = ({
   playersPerMatch = 2,
   checkInToken
 }: ParticipantsTabProps) => {
-  const navigate = useNavigate();
   const [participants, setParticipants] = useState<any[]>([]);
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [newName, setNewName] = useState("");
@@ -159,6 +157,7 @@ export const ParticipantsTab = ({
       toast.error("Failed to remove participant");
       return;
     }
+    setParticipants((prev) => prev.filter((p) => p.id !== id));
     toast.success("Participant removed");
   };
 
@@ -597,22 +596,16 @@ export const ParticipantsTab = ({
           >
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2 flex-1">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCheckIn(participant.id, participant.checked_in);
-                  }}
-                  className="p-1 hover:bg-accent rounded"
-                >
+                <div className="p-1">
                   {participant.checked_in ? (
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                   ) : (
                     <Circle className="h-5 w-5 text-muted-foreground" />
                   )}
-                </button>
-                <span 
+                </div>
+                <span
                   className="font-medium flex-1"
-                  onClick={() => navigate(`/participant/${participant.id}`)}
+                  onClick={() => toggleCheckIn(participant.id, participant.checked_in)}
                 >
                   {participant.name}
                 </span>
@@ -629,17 +622,19 @@ export const ParticipantsTab = ({
                 >
                   <EditIcon className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteParticipant(participant.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {!participant.checked_in && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteParticipant(participant.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
