@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 import type { BoardGameDefault } from "@/lib/boardGameDefaults";
 
 const tournamentSchema = z.object({
@@ -26,6 +27,7 @@ interface CreateTournamentDialogProps {
 }
 
 export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: CreateTournamentDialogProps) => {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<"swiss" | "eliminatory" | "round_robin" | "catan" | "multigame" | "carcassonne">("swiss");
@@ -99,6 +101,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: 
       if (error) throw error;
 
       toast.success("Tournament created successfully!");
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
       onOpenChange(false);
       setName("");
       setType("swiss");

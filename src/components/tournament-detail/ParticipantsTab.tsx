@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Shuffle, Edit as EditIcon, CheckCircle2, Circle, QrCode, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EditParticipantDialog } from "./EditParticipantDialog";
 import { CheckInQRDialog } from "./CheckInQRDialog";
 import { ExcelImportDialog } from "./ExcelImportDialog";
@@ -38,16 +38,20 @@ interface ParticipantsTabProps {
   matchGenerationMode?: string;
   playersPerMatch?: number;
   checkInToken?: string;
+  onTournamentUpdate?: () => void;
+  onMatchesGenerated?: () => void;
 }
 
-export const ParticipantsTab = ({ 
-  tournamentId, 
-  tournamentType, 
-  maxParticipants, 
-  numberOfRounds, 
-  matchGenerationMode, 
+export const ParticipantsTab = ({
+  tournamentId,
+  tournamentType,
+  maxParticipants,
+  numberOfRounds,
+  matchGenerationMode,
   playersPerMatch = 2,
-  checkInToken
+  checkInToken,
+  onTournamentUpdate,
+  onMatchesGenerated
 }: ParticipantsTabProps) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [existingNames, setExistingNames] = useState<string[]>([]);
@@ -239,12 +243,20 @@ export const ParticipantsTab = ({
         if (deleteError) throw deleteError;
       }
 
+      // Update number of participants to checked-in count
+      await supabase
+        .from("tournaments")
+        .update({ number_of_participants: activeParticipants.length })
+        .eq("id", tournamentId);
+      onTournamentUpdate?.();
+
       // Delete existing matches and match_participants
       await supabase.from("matches").delete().eq("tournament_id", tournamentId);
 
       const matches: any[] = [];
       const matchParticipants: any[] = [];
 
+      console.log(tournamentType, isManualMode)
       if (isManualMode) {
         if (tournamentType === "catan") {
           // Generate smart pairings using the existing algorithm
@@ -331,6 +343,7 @@ export const ParticipantsTab = ({
         // Generate Catan pairings with no repeats
         const allRoundMatches = generateCatanPairings(activeParticipants, rounds);
         
+        console.log(allRoundMatches)
         for (let round = 1; round <= rounds; round++) {
           const roundMatches = allRoundMatches[round - 1] || [];
           
@@ -346,6 +359,8 @@ export const ParticipantsTab = ({
             });
           }
         }
+
+        console.log(matches)
 
         // Insert matches first
         const { data: insertedMatches, error: matchError } = await supabase
@@ -452,6 +467,7 @@ export const ParticipantsTab = ({
       if (notCheckedIn.length > 0) {
         fetchParticipants();
       }
+      onMatchesGenerated?.();
     } catch (error) {
       console.error("Match generation error:", error);
       toast.error("Failed to generate matches");
@@ -672,27 +688,18 @@ export const ParticipantsTab = ({
         currentCount={participants.length}
       />
 
-      <AlertDialog open={showConfirmGenerate} onOpenChange={setShowConfirmGenerate}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove unchecked participants?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingNotCheckedIn.length} participant(s) are not checked in and will be permanently removed from the tournament.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const checkedIn = participants.filter(p => p.checked_in);
-                executeGenerateMatches(checkedIn, pendingNotCheckedIn);
-              }}
-            >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showConfirmGenerate}
+        onOpenChange={setShowConfirmGenerate}
+        title="Remove unchecked participants?"
+        description={`${pendingNotCheckedIn.length} participant(s) are not checked in and will be permanently removed from the tournament.`}
+        confirmLabel="Continue"
+        variant="destructive"
+        onConfirm={() => {
+          const checkedIn = participants.filter(p => p.checked_in);
+          executeGenerateMatches(checkedIn, pendingNotCheckedIn);
+        }}
+      />
     </div>
   );
 };

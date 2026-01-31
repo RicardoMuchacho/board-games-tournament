@@ -367,7 +367,7 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
                   className="gap-2"
                 >
                   <Shuffle className="h-4 w-4" />
-                  Auto Next Round
+                  Auto Next Round Test
                 </Button>
                 <Button
                   variant="outline"

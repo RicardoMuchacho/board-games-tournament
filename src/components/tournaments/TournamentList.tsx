@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,61 +6,74 @@ import { Button } from "@/components/ui/button";
 import { Copy, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { CopyTournamentDialog } from "./CopyTournamentDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+
+const PAGE_SIZE = 10;
+
+const fetchTournaments = async ({ pageParam = 0 }: { pageParam?: number }) => {
+  const from = pageParam * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("*, participants(count)")
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+  return { data: data || [], nextPage: (data?.length ?? 0) === PAGE_SIZE ? pageParam + 1 : undefined };
+};
 
 export const TournamentList = () => {
   const navigate = useNavigate();
-  const [tournaments, setTournaments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [tournamentToCopy, setTournamentToCopy] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTournaments();
+  const {
+    data,
+    isLoading: loading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["tournaments"],
+    queryFn: fetchTournaments,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextPage,
+  });
 
-    const channel = supabase
-      .channel("tournaments-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tournaments" },
-        () => {
-          fetchTournaments();
-        }
-      )
-      .subscribe();
+  const tournaments = data?.pages.flatMap((page) => page.data) ?? [];
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchTournaments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("tournaments")
-        .select("*, participants(count)")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setTournaments(data || []);
-    } catch (error: any) {
-      toast.error("Failed to load tournaments");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this tournament?")) return;
-
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from("tournaments").delete().eq("id", id);
       if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
       toast.success("Tournament deleted successfully");
-    } catch (error: any) {
+    },
+    onError: () => {
       toast.error("Failed to delete tournament");
-    }
+    },
+    onSettled: () => {
+      setDeleteId(null);
+    },
+  });
+
+  const handleDeleteClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteId) return;
+    deleteMutation.mutate(deleteId);
   };
 
   const handleCopy = (tournament: any, e: React.MouseEvent) => {
@@ -122,7 +135,7 @@ export const TournamentList = () => {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={(e) => handleDelete(tournament.id, e)}
+                  onClick={(e) => handleDeleteClick(tournament.id, e)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -143,10 +156,33 @@ export const TournamentList = () => {
         </Card>
       ))}
 
+      {hasNextPage && (
+        <div className="col-span-full flex justify-center pt-2">
+          <Button
+            variant="outline"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Load More
+          </Button>
+        </div>
+      )}
+
       <CopyTournamentDialog
         open={copyDialogOpen}
         onOpenChange={setCopyDialogOpen}
         tournament={tournamentToCopy}
+      />
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => { if (!open) setDeleteId(null); }}
+        title="Delete tournament?"
+        description="This action cannot be undone. The tournament and all its data will be permanently deleted."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeleteConfirm}
       />
     </div>
   );

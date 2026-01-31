@@ -22,6 +22,7 @@ const TournamentDetail = () => {
   const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editingTournament, setEditingTournament] = useState(false);
+  const [activeTab, setActiveTab] = useState("participants");
 
   useEffect(() => {
     fetchTournament();
@@ -73,7 +74,7 @@ const TournamentDetail = () => {
           </Button>
         </div>
 
-        <Tabs defaultValue="participants" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-md">
             <TabsTrigger value="participants">Participants</TabsTrigger>
             <TabsTrigger value="matches">Matches</TabsTrigger>
@@ -88,6 +89,8 @@ const TournamentDetail = () => {
               matchGenerationMode={tournament.match_generation_mode}
               playersPerMatch={tournament.players_per_match}
               checkInToken={tournament.check_in_token}
+              onTournamentUpdate={fetchTournament}
+              onMatchesGenerated={() => setActiveTab("matches")}
             />
           </TabsContent>
           <TabsContent value="matches" className="mt-6">
