@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
+import type { BoardGameDefault } from "@/lib/boardGameDefaults";
 
 const tournamentSchema = z.object({
   name: z.string().trim().min(3, "Name must be at least 3 characters").max(100, "Name must be less than 100 characters"),
@@ -21,9 +22,10 @@ const tournamentSchema = z.object({
 interface CreateTournamentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  boardGamePreset?: BoardGameDefault | null;
 }
 
-export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentDialogProps) => {
+export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: CreateTournamentDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<"swiss" | "eliminatory" | "round_robin" | "catan" | "multigame" | "carcassonne">("swiss");
@@ -31,6 +33,20 @@ export const CreateTournamentDialog = ({ open, onOpenChange }: CreateTournamentD
   const [numberOfRounds, setNumberOfRounds] = useState<number | undefined>(undefined);
   const [matchGenerationMode, setMatchGenerationMode] = useState<"auto" | "manual">("auto");
   const [playersPerMatch, setPlayersPerMatch] = useState<number>(2);
+
+  useEffect(() => {
+    if (open && boardGamePreset?.defaults) {
+      setType(boardGamePreset.defaults.type);
+      setMatchGenerationMode(boardGamePreset.defaults.matchGenerationMode);
+      setPlayersPerMatch(boardGamePreset.defaults.playersPerMatch);
+      setNumberOfRounds(boardGamePreset.defaults?.numberOfRounds);
+    } else if (open && boardGamePreset === null) {
+      // "Others" - reset to empty defaults
+      setType("swiss");
+      setMatchGenerationMode("auto");
+      setPlayersPerMatch(2);
+    }
+  }, [open, boardGamePreset]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

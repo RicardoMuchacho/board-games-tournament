@@ -245,6 +245,7 @@ export type Database = {
       tournaments: {
         Row: {
           check_in_token: string | null
+          board_game: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -258,6 +259,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          board_game?: string | null
           check_in_token?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -272,6 +274,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          board_game?: string | null
           check_in_token?: string | null
           created_at?: string | null
           created_by?: string | null

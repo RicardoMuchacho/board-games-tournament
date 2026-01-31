@@ -7,7 +7,10 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* About KLEFF */}
           <div>
-            <h3 className="font-semibold text-lg mb-3">About KLEFF Barcelona</h3>
+            <div className="flex items-center gap-2 mb-3">
+              <img src="/assets/kleffLogoSmall.png" alt="Kleff" className="h-6" />
+              <h3 className="font-semibold text-lg">About KLEFF Barcelona</h3>
+            </div>
             <p className="text-sm text-muted-foreground mb-2">
               Tournament management platform created by KLEFF Barcelona, 
               the board game enthusiasts community.

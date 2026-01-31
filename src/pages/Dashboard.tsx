@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Trophy } from "lucide-react";
 import { TournamentList } from "@/components/tournaments/TournamentList";
 import { CreateTournamentDialog } from "@/components/tournaments/CreateTournamentDialog";
+import { boardGameDefaults, type BoardGameDefault } from "@/lib/boardGameDefaults";
 
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<BoardGameDefault | null | undefined>(undefined);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -61,10 +63,10 @@ const Dashboard = () => {
               <Trophy className="h-4 w-4" />
               Leaderboard
             </Button>
-            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+            {/* <Button onClick={() => { setSelectedPreset(undefined); setShowCreateDialog(true); }} className="gap-2">
               <Plus className="h-4 w-4" />
               New Tournament
-            </Button>
+            </Button> */}
             <Button variant="outline" onClick={handleSignOut} className="gap-2">
               <LogOut className="h-4 w-4" />
               Sign Out
@@ -72,12 +74,44 @@ const Dashboard = () => {
           </div>
         </header>
 
+        <h2 className="text-xl font-semibold mb-4">Create Tournament</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          {boardGameDefaults.map((game) => (
+            <button
+              key={game.id}
+              onClick={() => {
+                setSelectedPreset(game.defaults ? game : null);
+                setShowCreateDialog(true);
+              }}
+              className="relative overflow-hidden rounded-xl h-36 group focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <img
+                src={game.image}
+                alt={game.name}
+                className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+              <span className="absolute bottom-3 left-4 text-white text-lg font-semibold">
+                {game.name}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <h2 className="text-xl font-semibold mb-4">Tournament History</h2>
         <div className="space-y-6">
           <TournamentList />
         </div>
       </div>
 
-      <CreateTournamentDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
+      <CreateTournamentDialog
+        open={showCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) setSelectedPreset(undefined);
+        }}
+        boardGamePreset={selectedPreset}
+      />
     </div>
   );
 };

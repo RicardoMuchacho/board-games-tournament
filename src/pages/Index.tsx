@@ -22,7 +22,7 @@ const Index = () => {
       <header className="border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+            <img src="/assets/kleffLogoSmall.png" alt="Kleff" className="h-6 sm:h-8" />
             <span className="text-base sm:text-xl font-bold">Tournament Manager</span>
           </div>
           <Button variant="outline" onClick={() => navigate("/auth")}>
