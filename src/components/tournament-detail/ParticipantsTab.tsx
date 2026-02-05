@@ -156,8 +156,6 @@ export const ParticipantsTab = ({
       .delete()
       .in("id", notCheckedIn.map(p => p.id));
     if (error) throw error;
-
-    fetchParticipants();
   };
 
   const insertCatanMatches = async (activeParticipants: any[], rounds: number) => {
@@ -267,15 +265,16 @@ export const ParticipantsTab = ({
 
     setLoading(true);
     try {
-      await removeNotCheckedIn();
-
-      await supabase
-        .from("tournaments")
-        .update({ number_of_participants: activeParticipants.length })
-        .eq("id", tournamentId);
+      // Run independent cleanup operations in parallel
+      await Promise.all([
+        removeNotCheckedIn(),
+        supabase
+          .from("tournaments")
+          .update({ number_of_participants: activeParticipants.length })
+          .eq("id", tournamentId),
+        supabase.from("matches").delete().eq("tournament_id", tournamentId)
+      ]);
       onTournamentUpdate?.();
-
-      await supabase.from("matches").delete().eq("tournament_id", tournamentId);
 
       let matchCount: number;
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,52 +19,23 @@ interface CatanMatchesTabProps {
 export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, tournamentName }: CatanMatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [matchParticipants, setMatchParticipants] = useState<{ [key: string]: any[] }>({});
-  const [scores, setScores] = useState<{ 
-    [matchId: string]: { 
-      [participantId: string]: { 
-        victoryPoints: number; 
+  const [scores, setScores] = useState<{
+    [matchId: string]: {
+      [participantId: string]: {
+        victoryPoints: number;
         tournamentPoints: number;
         placement: number;
-      } 
-    } 
+      }
+    }
   }>({});
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMatch, setEditingMatch] = useState<{ id: string; participantIds: string[] } | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
 
-  useEffect(() => {
-    fetchMatches();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-    const matchesChannel = supabase
-      .channel(`catan-matches-${tournamentId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
-        () => {
-          fetchMatches();
-        }
-      )
-      .subscribe();
-
-    const participantsChannel = supabase
-      .channel(`catan-match-participants-${tournamentId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "match_participants" },
-        () => {
-          fetchMatches();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(matchesChannel);
-      supabase.removeChannel(participantsChannel);
-    };
-  }, [tournamentId]);
-
-  const fetchMatches = async () => {
+  const fetchMatches = useCallback(async () => {
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
       .select("*")
@@ -110,7 +81,50 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
     }
 
     setMatchParticipants(groupedParticipants);
-  };
+  }, [tournamentId]);
+
+  const debouncedFetchMatches = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchMatches();
+    }, 300);
+  }, [fetchMatches]);
+
+  useEffect(() => {
+    fetchMatches();
+
+    const matchesChannel = supabase
+      .channel(`catan-matches-${tournamentId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
+        () => {
+          debouncedFetchMatches();
+        }
+      )
+      .subscribe();
+
+    const participantsChannel = supabase
+      .channel(`catan-match-participants-${tournamentId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "match_participants" },
+        () => {
+          debouncedFetchMatches();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(matchesChannel);
+      supabase.removeChannel(participantsChannel);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [tournamentId, fetchMatches, debouncedFetchMatches]);
 
   const updateMatchScores = async (matchId: string) => {
     const matchScores = scores[matchId];
