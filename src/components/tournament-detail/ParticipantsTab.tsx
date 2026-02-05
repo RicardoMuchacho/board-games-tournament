@@ -194,11 +194,94 @@ export const ParticipantsTab = ({
     toast.success("All participants checked in");
   };
 
+  const removeNotCheckedIn = async () => {
+    const notCheckedIn = participants.filter(p => !p.checked_in);
+    if (notCheckedIn.length === 0) return;
+
+    const { error } = await supabase
+      .from("participants")
+      .delete()
+      .in("id", notCheckedIn.map(p => p.id));
+    if (error) throw error;
+
+    fetchParticipants();
+  };
+
+  const insertCatanMatches = async (activeParticipants: any[], rounds: number) => {
+    const allRoundMatches = generateCatanPairings(activeParticipants, rounds);
+    const matches: any[] = [];
+
+    for (let round = 1; round <= rounds; round++) {
+      const roundMatches = allRoundMatches[round - 1] || [];
+      for (const matchPlayers of roundMatches) {
+        matches.push({
+          tournament_id: tournamentId,
+          round,
+          player1_id: matchPlayers[0]?.id,
+          player2_id: matchPlayers[1]?.id,
+          player3_id: matchPlayers[2]?.id,
+          player4_id: matchPlayers[3]?.id || null,
+          status: "pending",
+        });
+      }
+    }
+
+    const { data: insertedMatches, error: matchError } = await supabase
+      .from("matches")
+      .insert(matches)
+      .select();
+    if (matchError) throw matchError;
+
+    if (insertedMatches) {
+      const matchParticipants: any[] = [];
+      let matchIndex = 0;
+      for (let round = 1; round <= rounds; round++) {
+        const roundMatches = allRoundMatches[round - 1] || [];
+        for (const matchPlayers of roundMatches) {
+          const match = insertedMatches[matchIndex++];
+          for (const player of matchPlayers) {
+            matchParticipants.push({
+              match_id: match.id,
+              participant_id: player.id,
+              victory_points: 0,
+              tournament_points: 0,
+            });
+          }
+        }
+      }
+
+      if (matchParticipants.length > 0) {
+        // @ts-ignore - match_participants table type not yet in generated types
+        const { error: mpError } = await (supabase as any)
+          .from("match_participants")
+          .insert(matchParticipants);
+        if (mpError) throw mpError;
+      }
+    }
+
+    return matches.length;
+  };
+
+  const insertPairMatches = async (pairings: any[][]) => {
+    const matches: any[] = pairings.map(([player1, player2]) => ({
+      tournament_id: tournamentId,
+      round: 1,
+      player1_id: player1.id,
+      player2_id: player2.id,
+      status: "pending",
+    }));
+
+    const { error } = await supabase.from("matches").insert(matches);
+    if (error) throw error;
+
+    return matches.length;
+  };
+
   const generateMatches = async () => {
     const checkedInParticipants = participants.filter(p => p.checked_in);
     const notCheckedIn = participants.filter(p => !p.checked_in);
     const isManualMode = matchGenerationMode === "manual";
-    
+
     if (checkedInParticipants.length === 0) {
       toast.error("No participants checked in. Please check in participants before generating matches.");
       return;
@@ -216,240 +299,77 @@ export const ParticipantsTab = ({
       }
     }
 
-    // Confirm deletion of non-checked-in participants
     if (notCheckedIn.length > 0) {
       setPendingNotCheckedIn(notCheckedIn);
       setShowConfirmGenerate(true);
       return;
     }
 
-    await executeGenerateMatches(checkedInParticipants, notCheckedIn);
+    await executeGenerateMatches(checkedInParticipants);
   };
 
-  const executeGenerateMatches = async (checkedInParticipants: any[], notCheckedIn: any[]) => {
-    const activeParticipants = checkedInParticipants;
+  const executeGenerateMatches = async (activeParticipants: any[]) => {
     const isManualMode = matchGenerationMode === "manual";
     const rounds = numberOfRounds || 1;
 
     setLoading(true);
     try {
-      // Delete non-checked-in participants
-      if (notCheckedIn.length > 0) {
-        const { error: deleteError } = await supabase
-          .from("participants")
-          .delete()
-          .in("id", notCheckedIn.map(p => p.id));
-        
-        if (deleteError) throw deleteError;
-      }
+      await removeNotCheckedIn();
 
-      // Update number of participants to checked-in count
       await supabase
         .from("tournaments")
         .update({ number_of_participants: activeParticipants.length })
         .eq("id", tournamentId);
       onTournamentUpdate?.();
 
-      // Delete existing matches and match_participants
       await supabase.from("matches").delete().eq("tournament_id", tournamentId);
 
-      const matches: any[] = [];
-      const matchParticipants: any[] = [];
+      let matchCount: number;
 
-      console.log(tournamentType, isManualMode)
-      if (isManualMode) {
-        if (tournamentType === "catan") {
-          // Generate smart pairings using the existing algorithm
-          const allRoundMatches = generateCatanPairings(activeParticipants, rounds);
-          
-          for (let round = 1; round <= rounds; round++) {
-            const roundMatches = allRoundMatches[round - 1] || [];
-            
-            for (const matchPlayers of roundMatches) {
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: matchPlayers[0]?.id,
-                player2_id: matchPlayers[1]?.id,
-                player3_id: matchPlayers[2]?.id,
-                player4_id: matchPlayers[3]?.id || null,
-                status: "pending",
-              });
-            }
-          }
+      if (tournamentType === "catan") {
+        matchCount = await insertCatanMatches(activeParticipants, rounds);
+        toast.success(`Generated ${matchCount} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
+      } else if (isManualMode) {
+        const { tableSizes } = calculateTableDistribution(activeParticipants.length, playersPerMatch, 2);
+        const matchesPerRound = tableSizes.length || Math.ceil(activeParticipants.length / playersPerMatch);
+        const matches: any[] = [];
 
-          // Insert matches first
-          const { data: insertedMatches, error: matchError } = await supabase
-            .from("matches")
-            .insert(matches)
-            .select();
-          
-          if (matchError) throw matchError;
-
-          // Create match_participants
-          if (insertedMatches) {
-            let matchIndex = 0;
-            for (let round = 1; round <= rounds; round++) {
-              const roundMatches = allRoundMatches[round - 1] || [];
-              
-              for (const matchPlayers of roundMatches) {
-                const match = insertedMatches[matchIndex++];
-                
-                for (const player of matchPlayers) {
-                  matchParticipants.push({
-                    match_id: match.id,
-                    participant_id: player.id,
-                    victory_points: 0,
-                    tournament_points: 0,
-                  });
-                }
-              }
-            }
-
-            // Insert match_participants
-            if (matchParticipants.length > 0) {
-              // @ts-ignore
-              const { error: mpError } = await (supabase as any)
-                .from("match_participants")
-                .insert(matchParticipants);
-              if (mpError) throw mpError;
-            }
-          }
-
-          toast.success(`Generated ${matches.length} matches with smart pairing across ${rounds} round${rounds > 1 ? 's' : ''}`);
-        } else {
-          // Manual mode for non-Catan: Create blank matches with smart distribution
-          const { tableSizes } = calculateTableDistribution(activeParticipants.length, playersPerMatch, 2);
-          const matchesPerRound = tableSizes.length || Math.ceil(activeParticipants.length / playersPerMatch);
-          
-          for (let round = 1; round <= rounds; round++) {
-            for (let i = 0; i < matchesPerRound; i++) {
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: null,
-                player2_id: null,
-                status: "pending",
-              });
-            }
-          }
-
-          const { error } = await supabase.from("matches").insert(matches);
-          if (error) throw error;
-
-          toast.success(`Generated ${matches.length} blank matches for manual assignment`);
-        }
-      } else if (tournamentType === "catan") {
-        // Generate Catan pairings with no repeats
-        const allRoundMatches = generateCatanPairings(activeParticipants, rounds);
-        
-        console.log(allRoundMatches)
         for (let round = 1; round <= rounds; round++) {
-          const roundMatches = allRoundMatches[round - 1] || [];
-          
-          for (const matchPlayers of roundMatches) {
+          for (let i = 0; i < matchesPerRound; i++) {
             matches.push({
               tournament_id: tournamentId,
-              round: round,
-              player1_id: matchPlayers[0]?.id,
-              player2_id: matchPlayers[1]?.id,
-              player3_id: matchPlayers[2]?.id,
-              player4_id: matchPlayers[3]?.id || null,
+              round,
+              player1_id: null,
+              player2_id: null,
               status: "pending",
             });
           }
         }
 
-        console.log(matches)
+        const { error } = await supabase.from("matches").insert(matches);
+        if (error) throw error;
 
-        // Insert matches first
-        const { data: insertedMatches, error: matchError } = await supabase
-          .from("matches")
-          .insert(matches)
-          .select();
-        
-        if (matchError) throw matchError;
-
-        // Create match_participants using the pairing results
-        if (insertedMatches) {
-          let matchIndex = 0;
-          for (let round = 1; round <= rounds; round++) {
-            const roundMatches = allRoundMatches[round - 1] || [];
-            
-            for (const matchPlayers of roundMatches) {
-              const match = insertedMatches[matchIndex++];
-              
-              for (const player of matchPlayers) {
-                matchParticipants.push({
-                  match_id: match.id,
-                  participant_id: player.id,
-                  victory_points: 0,
-                  tournament_points: 0,
-                });
-              }
-            }
-          }
-
-          // Insert match_participants
-          if (matchParticipants.length > 0) {
-            // @ts-ignore - match_participants table type not yet in generated types
-            const { error: mpError } = await (supabase as any)
-              .from("match_participants")
-              .insert(matchParticipants);
-            if (mpError) throw mpError;
-          }
-        }
-
-        toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
+        matchCount = matches.length;
+        toast.success(`Generated ${matchCount} blank matches for manual assignment`);
       } else if (tournamentType === "round_robin") {
-        // Generate Round Robin pairings
         const allRoundMatches = generateRoundRobinPairings(activeParticipants);
-        const roundMatches = allRoundMatches[0];
-        
-        for (const [player1, player2] of roundMatches) {
-          matches.push({
-            tournament_id: tournamentId,
-            round: 1,
-            player1_id: player1.id,
-            player2_id: player2.id,
-            status: "pending",
-          });
-        }
-
-        const { error } = await supabase.from("matches").insert(matches);
-        if (error) throw error;
-
-        toast.success(`Generated ${matches.length} matches`);
+        matchCount = await insertPairMatches(allRoundMatches[0]);
+        toast.success(`Generated ${matchCount} matches`);
       } else if (tournamentType === "eliminatory") {
-        // Generate Eliminatory bracket
         const allRoundMatches = generateEliminatoryPairings(activeParticipants);
-        const roundMatches = allRoundMatches[0];
-        
-        for (const [player1, player2] of roundMatches) {
-          matches.push({
-            tournament_id: tournamentId,
-            round: 1,
-            player1_id: player1.id,
-            player2_id: player2.id,
-            status: "pending",
-          });
-        }
-
-        const { error } = await supabase.from("matches").insert(matches);
-        if (error) throw error;
-
-        toast.success(`Generated ${matches.length} matches`);
+        matchCount = await insertPairMatches(allRoundMatches[0]);
+        toast.success(`Generated ${matchCount} matches`);
       } else {
-        // Swiss: Generate pairings with win-based matching
+        // Swiss
         const allRoundMatches = generateSwissPairings(activeParticipants, rounds, [], playersPerMatch);
-        
+        const matches: any[] = [];
+
         for (let round = 1; round <= rounds; round++) {
           const roundMatches = allRoundMatches[round - 1] || [];
-          
           for (const matchPlayers of roundMatches) {
             matches.push({
               tournament_id: tournamentId,
-              round: round,
+              round,
               player1_id: matchPlayers[0]?.id,
               player2_id: matchPlayers[1]?.id,
               status: "pending",
@@ -460,13 +380,10 @@ export const ParticipantsTab = ({
         const { error } = await supabase.from("matches").insert(matches);
         if (error) throw error;
 
-        toast.success(`Generated ${matches.length} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
+        matchCount = matches.length;
+        toast.success(`Generated ${matchCount} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       }
 
-      // Refresh participants list after deletion
-      if (notCheckedIn.length > 0) {
-        fetchParticipants();
-      }
       onMatchesGenerated?.();
     } catch (error) {
       console.error("Match generation error:", error);
@@ -697,7 +614,7 @@ export const ParticipantsTab = ({
         variant="destructive"
         onConfirm={() => {
           const checkedIn = participants.filter(p => p.checked_in);
-          executeGenerateMatches(checkedIn, pendingNotCheckedIn);
+          executeGenerateMatches(checkedIn);
         }}
       />
     </div>
