@@ -81,10 +81,9 @@ const TournamentDetail = () => {
             <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
           <TabsContent value="participants" className="mt-6">
-            <ParticipantsTab 
-              tournamentId={id!} 
-              tournamentType={tournament.type} 
-              maxParticipants={tournament.number_of_participants}
+            <ParticipantsTab
+              tournamentId={id!}
+              tournamentType={tournament.type}
               numberOfRounds={tournament.number_of_rounds}
               matchGenerationMode={tournament.match_generation_mode}
               playersPerMatch={tournament.players_per_match}
@@ -116,13 +115,14 @@ const TournamentDetail = () => {
                 tournamentName={tournament.name}
               />
             ) : (
-              <MatchesTab 
-                tournamentId={id!} 
+              <MatchesTab
+                tournamentId={id!}
                 tournamentType={tournament.type}
                 numberOfRounds={tournament.number_of_rounds}
                 playersPerMatch={tournament.players_per_match}
                 checkInToken={tournament.check_in_token}
                 tournamentName={tournament.name}
+                matchGenerationMode={tournament.match_generation_mode}
               />
             )}
           </TabsContent>
@@ -145,7 +145,6 @@ const TournamentDetail = () => {
           tournamentId={id!}
           currentName={tournament.name}
           currentNumberOfRounds={tournament.number_of_rounds}
-          currentNumberOfParticipants={tournament.number_of_participants}
           tournamentType={tournament.type}
           playersPerMatch={tournament.players_per_match}
           onUpdate={fetchTournament}

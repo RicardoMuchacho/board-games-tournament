@@ -17,9 +17,10 @@ interface MatchesTabProps {
   playersPerMatch?: number;
   checkInToken?: string;
   tournamentName?: string;
+  matchGenerationMode?: string;
 }
 
-export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playersPerMatch = 2, checkInToken, tournamentName }: MatchesTabProps) => {
+export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playersPerMatch = 2, checkInToken, tournamentName, matchGenerationMode }: MatchesTabProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [scores, setScores] = useState<{ [key: string]: { p1: number; p2: number } }>({});
@@ -275,8 +276,8 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
         toast.success(`Round ${nextRound} generated with smart pairing`);
       } else {
         // Manual mode: create blank matches
-        const matchesNeeded = Math.ceil(participants.length / 2);
-        
+        const matchesNeeded = Math.ceil(participants.length / playersPerMatch);
+
         for (let i = 0; i < matchesNeeded; i++) {
           newMatches.push({
             tournament_id: tournamentId,
@@ -358,7 +359,7 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
                 QR Results
               </Button>
             )}
-            {tournamentType !== "eliminatory" && tournamentType !== "round_robin" && (
+            {tournamentType !== "eliminatory" && tournamentType !== "round_robin" && matchGenerationMode === "auto" && (
               <div className="flex gap-2 ml-auto">
                 <Button
                   variant="outline"
@@ -367,16 +368,7 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
                   className="gap-2"
                 >
                   <Shuffle className="h-4 w-4" />
-                  Auto Next Round Test
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => generateNextRound("manual")}
-                  disabled={generatingRound}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Manual Next Round
+                  Generate Next Round
                 </Button>
               </div>
             )}
@@ -518,6 +510,42 @@ export const MatchesTab = ({ tournamentId, tournamentType, numberOfRounds, playe
               </CardContent>
             </Card>
           )}
+
+          {/* Generate Next Round button for manual mode */}
+          {matchGenerationMode === "manual" && (() => {
+            const highestRound = rounds.length > 0 ? Math.max(...rounds) : 0;
+            const highestRoundMatches = groupedMatches[highestRound] || [];
+            const allCompleted = highestRoundMatches.length > 0 && highestRoundMatches.every(m => m.status === "completed");
+            const canGenerateMore = !numberOfRounds || highestRound < numberOfRounds;
+            const isDisabled = generatingRound || !allCompleted || !canGenerateMore;
+
+            let statusMessage = "";
+            if (!canGenerateMore) {
+              statusMessage = `Maximum rounds (${numberOfRounds}) reached`;
+            } else if (!allCompleted) {
+              statusMessage = `Complete all matches in Round ${highestRound} to generate the next round`;
+            } else {
+              statusMessage = `All matches in Round ${highestRound} are completed`;
+            }
+
+            return (
+              <Card className={`border-dashed ${allCompleted && canGenerateMore ? "border-primary/50 bg-primary/5" : ""}`}>
+                <CardContent className="flex flex-col items-center justify-center py-8 gap-4">
+                  <p className="text-muted-foreground">
+                    {statusMessage}
+                  </p>
+                  <Button
+                    onClick={() => generateNextRound("manual")}
+                    disabled={isDisabled}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Generate Round {highestRound + 1}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </>
       )}
 

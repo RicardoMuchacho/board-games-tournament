@@ -28,8 +28,9 @@ export const boardGameDefaults: BoardGameDefault[] = [
     image: "/assets/bordGames/carcassone.png",
     defaults: {
       type: "carcassonne",
-      matchGenerationMode: "auto",
+      matchGenerationMode: "manual",
       playersPerMatch: 2,
+      numberOfRounds: 3,
     },
   },
   {

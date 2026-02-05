@@ -9,19 +9,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EditParticipantDialog } from "./EditParticipantDialog";
 import { CheckInQRDialog } from "./CheckInQRDialog";
 import { ExcelImportDialog } from "./ExcelImportDialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { 
   generateCatanPairings, 
   generateSwissPairings, 
@@ -33,7 +20,6 @@ import {
 interface ParticipantsTabProps {
   tournamentId: string;
   tournamentType: string;
-  maxParticipants?: number;
   numberOfRounds?: number;
   matchGenerationMode?: string;
   playersPerMatch?: number;
@@ -45,7 +31,6 @@ interface ParticipantsTabProps {
 export const ParticipantsTab = ({
   tournamentId,
   tournamentType,
-  maxParticipants,
   numberOfRounds,
   matchGenerationMode,
   playersPerMatch = 2,
@@ -54,9 +39,7 @@ export const ParticipantsTab = ({
   onMatchesGenerated
 }: ParticipantsTabProps) => {
   const [participants, setParticipants] = useState<any[]>([]);
-  const [existingNames, setExistingNames] = useState<string[]>([]);
   const [newName, setNewName] = useState("");
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<{ id: string; name: string } | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
@@ -66,7 +49,6 @@ export const ParticipantsTab = ({
 
   useEffect(() => {
     fetchParticipants();
-    fetchExistingNames();
 
     const channel = supabase
       .channel(`participants-${tournamentId}`)
@@ -98,28 +80,6 @@ export const ParticipantsTab = ({
     setParticipants(data || []);
   };
 
-  const fetchExistingNames = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("participants")
-      .select(`
-        name,
-        tournaments!inner(created_by)
-      `)
-      .eq("tournaments.created_by", user.id);
-
-    if (error) {
-      console.error("Failed to fetch existing names:", error);
-      return;
-    }
-
-    // Get unique names
-    const uniqueNames = [...new Set(data?.map((p: any) => p.name) || [])];
-    setExistingNames(uniqueNames.sort());
-  };
-
   const addParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -131,11 +91,6 @@ export const ParticipantsTab = ({
 
     if (newName.trim().length > 100) {
       toast.error("Name must be less than 100 characters");
-      return;
-    }
-
-    if (maxParticipants && participants.length >= maxParticipants) {
-      toast.error(`Maximum number of participants (${maxParticipants}) reached`);
       return;
     }
 
@@ -153,9 +108,7 @@ export const ParticipantsTab = ({
     }
 
     setNewName("");
-    setOpen(false);
     toast.success("Participant added");
-    fetchExistingNames(); // Refresh the list of existing names
   };
 
   const deleteParticipant = async (id: string) => {
@@ -334,23 +287,22 @@ export const ParticipantsTab = ({
         const matchesPerRound = tableSizes.length || Math.ceil(activeParticipants.length / playersPerMatch);
         const matches: any[] = [];
 
-        for (let round = 1; round <= rounds; round++) {
-          for (let i = 0; i < matchesPerRound; i++) {
-            matches.push({
-              tournament_id: tournamentId,
-              round,
-              player1_id: null,
-              player2_id: null,
-              status: "pending",
-            });
-          }
+        // Only generate first round for manual mode
+        for (let i = 0; i < matchesPerRound; i++) {
+          matches.push({
+            tournament_id: tournamentId,
+            round: 1,
+            player1_id: null,
+            player2_id: null,
+            status: "pending",
+          });
         }
 
         const { error } = await supabase.from("matches").insert(matches);
         if (error) throw error;
 
         matchCount = matches.length;
-        toast.success(`Generated ${matchCount} blank matches for manual assignment`);
+        toast.success(`Generated ${matchCount} blank matches for round 1`);
       } else if (tournamentType === "round_robin") {
         const allRoundMatches = generateRoundRobinPairings(activeParticipants);
         matchCount = await insertPairMatches(allRoundMatches[0]);
@@ -399,105 +351,38 @@ export const ParticipantsTab = ({
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-2">
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={open}
-                  className="flex-1 min-w-[200px] justify-start"
-                >
-                  {newName || "Select existing or type new name..."}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput 
-                    placeholder="Search or type new name..." 
-                    value={newName}
-                    onValueChange={setNewName}
-                  />
-                  <CommandList>
-                    {existingNames.length > 0 && (
-                      <>
-                        <CommandEmpty>Type to create new participant</CommandEmpty>
-                        <CommandGroup heading="Existing Participants">
-                          {existingNames
-                            .filter(name => 
-                              name.toLowerCase().includes(newName.toLowerCase()) &&
-                              !participants.some(p => p.name === name)
-                            )
-                            .map((name) => (
-                              <CommandItem
-                                key={name}
-                                value={name}
-                                onSelect={async (selectedName) => {
-                                  if (maxParticipants && participants.length >= maxParticipants) {
-                                    toast.error(`Maximum number of participants (${maxParticipants}) reached`);
-                                    setOpen(false);
-                                    return;
-                                  }
-
-                                  const { error } = await supabase.from("participants").insert([
-                                    {
-                                      tournament_id: tournamentId,
-                                      name: selectedName,
-                                      checked_in: false,
-                                    },
-                                  ]);
-
-                                  if (error) {
-                                    toast.error(error.message || "Failed to add participant");
-                                  } else {
-                                    toast.success("Participant added");
-                                    fetchExistingNames();
-                                  }
-                                  
-                                  setNewName("");
-                                  setOpen(false);
-                                }}
-                              >
-                                {name}
-                              </CommandItem>
-                            ))}
-                        </CommandGroup>
-                      </>
-                    )}
-                    {existingNames.length === 0 && (
-                      <CommandEmpty>Type name and click Add</CommandEmpty>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            <Button 
-              onClick={(e) => {
-                e.preventDefault();
-                addParticipant(e as any);
-              }} 
+          <form onSubmit={addParticipant} className="flex flex-wrap gap-2">
+            <Input
+              placeholder="Enter participant name..."
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="flex-1 min-w-[200px]"
+            />
+            <Button
+              type="submit"
               className="gap-2"
               disabled={!newName.trim()}
             >
               <Plus className="h-4 w-4" />
               Add
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               className="gap-2"
               onClick={() => setShowExcelDialog(true)}
             >
               <FileSpreadsheet className="h-4 w-4" />
               Import Excel
             </Button>
-          </div>
+          </form>
         </CardContent>
       </Card>
 
       <div className="flex flex-wrap justify-between items-center gap-2">
         <div>
           <h3 className="text-lg font-semibold">
-            {participants.length} {maxParticipants ? `/ ${maxParticipants}` : ""} Participants
+            {participants.length} Participants
           </h3>
           <p className="text-sm text-muted-foreground">
             {checkedInCount} checked in
@@ -514,13 +399,13 @@ export const ParticipantsTab = ({
               QR Code
             </Button>
           )}
-          <Button 
-            onClick={generateMatches} 
-            disabled={loading || checkedInCount === 0} 
+          <Button
+            onClick={generateMatches}
+            disabled={loading || checkedInCount === 0}
             className="gap-2"
           >
             <Shuffle className="h-4 w-4" />
-            Generate Matches
+            {matchGenerationMode === "auto" ? "Generate Matches" : "Generate First Round"}
           </Button>
         </div>
       </div>
@@ -601,8 +486,6 @@ export const ParticipantsTab = ({
         open={showExcelDialog}
         onOpenChange={setShowExcelDialog}
         tournamentId={tournamentId}
-        maxParticipants={maxParticipants}
-        currentCount={participants.length}
       />
 
       <ConfirmDialog

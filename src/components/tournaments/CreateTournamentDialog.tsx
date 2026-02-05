@@ -14,7 +14,6 @@ import type { BoardGameDefault } from "@/lib/boardGameDefaults";
 const tournamentSchema = z.object({
   name: z.string().trim().min(3, "Name must be at least 3 characters").max(100, "Name must be less than 100 characters"),
   type: z.enum(["swiss", "eliminatory", "round_robin", "catan", "multigame", "carcassonne"]),
-  number_of_participants: z.number().min(2).max(100).optional(),
   number_of_rounds: z.number().min(1).max(50).optional(),
   match_generation_mode: z.enum(["auto", "manual"]),
   players_per_match: z.number().min(2).max(10).optional(),
@@ -31,7 +30,6 @@ export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: 
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<"swiss" | "eliminatory" | "round_robin" | "catan" | "multigame" | "carcassonne">("swiss");
-  const [numberOfParticipants, setNumberOfParticipants] = useState<number | undefined>(undefined);
   const [numberOfRounds, setNumberOfRounds] = useState<number | undefined>(undefined);
   const [matchGenerationMode, setMatchGenerationMode] = useState<"auto" | "manual">("auto");
   const [playersPerMatch, setPlayersPerMatch] = useState<number>(2);
@@ -55,18 +53,11 @@ export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: 
     setLoading(true);
 
     try {
-      // For eliminatory tournaments, calculate rounds automatically
-      let finalNumberOfRounds = numberOfRounds;
-      if (type === "eliminatory" && numberOfParticipants) {
-        finalNumberOfRounds = Math.ceil(Math.log2(numberOfParticipants));
-      }
-
       // Validate input
-      const validation = tournamentSchema.safeParse({ 
-        name, 
+      const validation = tournamentSchema.safeParse({
+        name,
         type,
-        number_of_participants: numberOfParticipants,
-        number_of_rounds: finalNumberOfRounds,
+        number_of_rounds: numberOfRounds,
         match_generation_mode: matchGenerationMode,
         players_per_match: type === "swiss" ? playersPerMatch : undefined,
       });
@@ -91,8 +82,7 @@ export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: 
           type: validation.data.type as any,
           status: "active",
           created_by: user.id,
-          number_of_participants: validation.data.number_of_participants,
-          number_of_rounds: finalNumberOfRounds,
+          number_of_rounds: validation.data.number_of_rounds,
           match_generation_mode: validation.data.match_generation_mode,
           players_per_match: validation.data.players_per_match || 2,
         },
@@ -105,7 +95,6 @@ export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: 
       onOpenChange(false);
       setName("");
       setType("swiss");
-      setNumberOfParticipants(undefined);
       setNumberOfRounds(undefined);
       setMatchGenerationMode("auto");
       setPlayersPerMatch(2);
@@ -174,18 +163,6 @@ export const CreateTournamentDialog = ({ open, onOpenChange, boardGamePreset }: 
               />
             </div>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="participants">Number of Participants (Optional)</Label>
-            <Input
-              id="participants"
-              type="number"
-              min="2"
-              max="100"
-              placeholder="e.g., 16"
-              value={numberOfParticipants || ""}
-              onChange={(e) => setNumberOfParticipants(e.target.value ? parseInt(e.target.value) : undefined)}
-            />
-          </div>
           {type !== "eliminatory" && (
             <div className="space-y-2">
               <Label htmlFor="rounds">Number of Rounds (Optional)</Label>

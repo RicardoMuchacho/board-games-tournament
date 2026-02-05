@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,8 +18,6 @@ interface ExcelImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tournamentId: string;
-  maxParticipants?: number;
-  currentCount: number;
 }
 
 interface ParsedParticipant {
@@ -31,8 +29,6 @@ export const ExcelImportDialog = ({
   open,
   onOpenChange,
   tournamentId,
-  maxParticipants,
-  currentCount,
 }: ExcelImportDialogProps) => {
   const [parsedData, setParsedData] = useState<ParsedParticipant[]>([]);
   const [fileName, setFileName] = useState<string>("");
@@ -99,17 +95,10 @@ export const ExcelImportDialog = ({
   const handleImport = async () => {
     if (parsedData.length === 0) return;
 
-    const availableSlots = maxParticipants ? maxParticipants - currentCount : Infinity;
-    const toImport = parsedData.slice(0, availableSlots);
-
-    if (toImport.length < parsedData.length) {
-      toast.warning(`Only importing ${toImport.length} of ${parsedData.length} participants due to limit`);
-    }
-
     setLoading(true);
     try {
       const { error } = await supabase.from("participants").insert(
-        toImport.map((p) => ({
+        parsedData.map((p) => ({
           tournament_id: tournamentId,
           name: p.name,
           phone: p.phone || null,
@@ -119,7 +108,7 @@ export const ExcelImportDialog = ({
 
       if (error) throw error;
 
-      toast.success(`Imported ${toImport.length} participants`);
+      toast.success(`Imported ${parsedData.length} participants`);
       onOpenChange(false);
       setParsedData([]);
       setFileName("");
@@ -182,14 +171,6 @@ export const ExcelImportDialog = ({
                   </div>
                 ))}
               </div>
-              {maxParticipants && currentCount + parsedData.length > maxParticipants && (
-                <div className="flex items-center gap-2 text-sm text-amber-500">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>
-                    Only {maxParticipants - currentCount} slots available. Some participants won't be imported.
-                  </span>
-                </div>
-              )}
             </div>
           )}
         </div>
