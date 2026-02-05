@@ -79,24 +79,37 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
 
     setMatches(matchesData || []);
 
-    // Fetch match participants for each match
-    for (const match of matchesData || []) {
-      // @ts-ignore - match_participants table type not yet in generated types
-      const { data: participantsData, error: participantsError } = await (supabase as any)
-        .from("match_participants")
-        .select(`
-          *,
-          participant:participants(id, name)
-        `)
-        .eq("match_id", match.id);
-
-      if (!participantsError && participantsData) {
-        setMatchParticipants((prev) => ({
-          ...prev,
-          [match.id]: participantsData,
-        }));
-      }
+    if (!matchesData || matchesData.length === 0) {
+      setMatchParticipants({});
+      return;
     }
+
+    // Fetch all match participants in a single batch query
+    const matchIds = matchesData.map(m => m.id);
+    // @ts-ignore - match_participants table type not yet in generated types
+    const { data: allParticipantsData, error: participantsError } = await (supabase as any)
+      .from("match_participants")
+      .select(`
+        *,
+        participant:participants(id, name)
+      `)
+      .in("match_id", matchIds);
+
+    if (participantsError) {
+      toast.error("Failed to load match participants");
+      return;
+    }
+
+    // Group participants by match_id
+    const groupedParticipants: { [key: string]: any[] } = {};
+    for (const mp of allParticipantsData || []) {
+      if (!groupedParticipants[mp.match_id]) {
+        groupedParticipants[mp.match_id] = [];
+      }
+      groupedParticipants[mp.match_id].push(mp);
+    }
+
+    setMatchParticipants(groupedParticipants);
   };
 
   const updateMatchScores = async (matchId: string) => {
@@ -104,32 +117,34 @@ export const CatanMatchesTab = ({ tournamentId, numberOfRounds, checkInToken, to
     if (!matchScores) return;
 
     try {
-      // Update or insert each participant's scores
-      for (const [participantId, scoreData] of Object.entries(matchScores)) {
-        // @ts-ignore - match_participants table type not yet in generated types
-        const { error } = await (supabase as any)
-          .from("match_participants")
-          .upsert({
-            match_id: matchId,
-            participant_id: participantId,
-            victory_points: scoreData.victoryPoints,
-            tournament_points: scoreData.tournamentPoints,
-            placement: scoreData.placement,
-          }, {
-            onConflict: "match_id,participant_id"
-          });
+      // Batch upsert all participants' scores in a single call
+      const upsertData = Object.entries(matchScores).map(([participantId, scoreData]) => ({
+        match_id: matchId,
+        participant_id: participantId,
+        victory_points: scoreData.victoryPoints,
+        tournament_points: scoreData.tournamentPoints,
+        placement: scoreData.placement,
+      }));
 
-        if (error) throw error;
-      }
+      // @ts-ignore - match_participants table type not yet in generated types
+      const { error: upsertError } = await (supabase as any)
+        .from("match_participants")
+        .upsert(upsertData, {
+          onConflict: "match_id,participant_id"
+        });
+
+      if (upsertError) throw upsertError;
 
       // Update match status to completed
-      await supabase
+      const { error: updateError } = await supabase
         .from("matches")
         .update({ status: "completed" })
         .eq("id", matchId);
 
+      if (updateError) throw updateError;
+
       toast.success("Match scores updated");
-      
+
       // Clear scores for this match
       setScores((prev) => {
         const newScores = { ...prev };
