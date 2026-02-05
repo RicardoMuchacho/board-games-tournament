@@ -8,6 +8,24 @@ export interface Participant {
   name: string;
 }
 
+export interface MatchResult {
+  player1_id: string;
+  player2_id: string | null;
+  player1_score: number | null;
+  player2_score: number | null;
+  winner_id: string | null;
+}
+
+export interface PlayerStanding {
+  id: string;
+  name: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  byeCount: number;
+  opponents: Set<string>;
+}
+
 export interface Game {
   id: string;
   name: string;
@@ -93,6 +111,223 @@ export function calculateTableDistribution(
   const tablesOfMin = Math.floor(totalPlayers / minSize);
   const tableSizes = Array(tablesOfMin).fill(minSize);
   return { tablesOfTarget: 0, tablesOfMin, tableSizes };
+}
+
+/**
+ * Calculate standings from completed matches
+ * Returns a map of player ID to their standing (wins, losses, draws, opponents faced)
+ */
+export function calculateStandings(
+  participants: Participant[],
+  completedMatches: MatchResult[]
+): Map<string, PlayerStanding> {
+  const standings = new Map<string, PlayerStanding>();
+
+  // Initialize standings for all participants
+  for (const p of participants) {
+    standings.set(p.id, {
+      id: p.id,
+      name: p.name,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      byeCount: 0,
+      opponents: new Set<string>(),
+    });
+  }
+
+  // Process completed matches
+  for (const match of completedMatches) {
+    const p1 = standings.get(match.player1_id);
+    if (!p1) continue;
+
+    // Check if this is a BYE match (no player2)
+    if (!match.player2_id) {
+      p1.wins++;
+      p1.byeCount++;
+      continue;
+    }
+
+    const p2 = standings.get(match.player2_id);
+    if (!p2) continue;
+
+    // Track opponents
+    p1.opponents.add(match.player2_id);
+    p2.opponents.add(match.player1_id);
+
+    // Determine winner
+    if (match.winner_id) {
+      // Explicit winner set
+      if (match.winner_id === match.player1_id) {
+        p1.wins++;
+        p2.losses++;
+      } else if (match.winner_id === match.player2_id) {
+        p2.wins++;
+        p1.losses++;
+      }
+    } else if (match.player1_score !== null && match.player2_score !== null) {
+      // Determine by score
+      if (match.player1_score > match.player2_score) {
+        p1.wins++;
+        p2.losses++;
+      } else if (match.player2_score > match.player1_score) {
+        p2.wins++;
+        p1.losses++;
+      } else {
+        // Draw
+        p1.draws++;
+        p2.draws++;
+      }
+    }
+  }
+
+  return standings;
+}
+
+/**
+ * Generate pairings for manual Swiss-style tournament
+ * - Round 1: Random pairing
+ * - Round 2+: Group by wins, match similar records, avoid repeats
+ * - Handles byes for odd player counts
+ *
+ * Returns array of pairings. Single-element arrays represent BYEs.
+ */
+export function generateManualSwissRound(
+  participants: Participant[],
+  completedMatches: MatchResult[],
+  roundNumber: number
+): Participant[][] {
+  if (participants.length < 2) {
+    return participants.length === 1 ? [[participants[0]]] : [];
+  }
+
+  const standings = calculateStandings(participants, completedMatches);
+  const pairings: Participant[][] = [];
+
+  // ROUND 1: Random pairing
+  if (roundNumber === 1) {
+    const shuffled = [...participants].sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < shuffled.length; i += 2) {
+      if (i + 1 < shuffled.length) {
+        pairings.push([shuffled[i], shuffled[i + 1]]);
+      } else {
+        // Odd player gets BYE
+        pairings.push([shuffled[i]]);
+      }
+    }
+
+    return pairings;
+  }
+
+  // ROUND 2+: Swiss-style pairing
+  // Sort players by wins (descending), then by losses (ascending)
+  const sortedPlayers = [...participants].sort((a, b) => {
+    const standingA = standings.get(a.id)!;
+    const standingB = standings.get(b.id)!;
+
+    // Primary: more wins first
+    if (standingB.wins !== standingA.wins) {
+      return standingB.wins - standingA.wins;
+    }
+    // Secondary: fewer losses first
+    return standingA.losses - standingB.losses;
+  });
+
+  const available = new Set(sortedPlayers.map(p => p.id));
+  const playerMap = new Map(participants.map(p => [p.id, p]));
+
+  // Pair players starting from top of standings
+  while (available.size >= 2) {
+    // Get first available player (highest ranked unpaired)
+    let player1Id: string | null = null;
+    for (const p of sortedPlayers) {
+      if (available.has(p.id)) {
+        player1Id = p.id;
+        break;
+      }
+    }
+    if (!player1Id) break;
+
+    const player1Standing = standings.get(player1Id)!;
+    available.delete(player1Id);
+
+    // Find best opponent for player1
+    let bestOpponentId: string | null = null;
+    let bestScore = -Infinity;
+
+    for (const p of sortedPlayers) {
+      if (!available.has(p.id)) continue;
+
+      const opponentStanding = standings.get(p.id)!;
+      let score = 0;
+
+      // Prefer players with similar win count
+      const winDiff = Math.abs(player1Standing.wins - opponentStanding.wins);
+      score -= winDiff * 10;
+
+      // Strongly prefer players who haven't played each other
+      if (player1Standing.opponents.has(p.id)) {
+        score -= 100;
+      }
+
+      // Slight preference for similar loss count
+      const lossDiff = Math.abs(player1Standing.losses - opponentStanding.losses);
+      score -= lossDiff;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestOpponentId = p.id;
+      }
+    }
+
+    if (bestOpponentId) {
+      available.delete(bestOpponentId);
+      pairings.push([playerMap.get(player1Id)!, playerMap.get(bestOpponentId)!]);
+    } else {
+      // No valid opponent found, this player gets a bye
+      pairings.push([playerMap.get(player1Id)!]);
+    }
+  }
+
+  // Handle remaining player (BYE)
+  if (available.size === 1) {
+    const remainingId = available.values().next().value;
+    const remainingPlayer = playerMap.get(remainingId)!;
+
+    // Try to give bye to player with fewest previous byes
+    // If this player already has a bye, try to swap with lowest-ranked paired player
+    const remainingStanding = standings.get(remainingId)!;
+
+    if (remainingStanding.byeCount > 0 && pairings.length > 0) {
+      // Try to swap with someone who has fewer byes
+      for (let i = pairings.length - 1; i >= 0; i--) {
+        const pair = pairings[i];
+        if (pair.length !== 2) continue;
+
+        for (let j = 0; j < 2; j++) {
+          const candidate = pair[j];
+          const candidateStanding = standings.get(candidate.id)!;
+
+          if (candidateStanding.byeCount < remainingStanding.byeCount) {
+            // Swap: candidate gets bye, remaining player takes their spot
+            pair[j] = remainingPlayer;
+            pairings.push([candidate]);
+            available.clear();
+            break;
+          }
+        }
+        if (available.size === 0) break;
+      }
+    }
+
+    // If still has bye, just assign it
+    if (available.size === 1) {
+      pairings.push([remainingPlayer]);
+    }
+  }
+
+  return pairings;
 }
 
 /**

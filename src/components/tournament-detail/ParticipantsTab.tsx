@@ -9,12 +9,12 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EditParticipantDialog } from "./EditParticipantDialog";
 import { CheckInQRDialog } from "./CheckInQRDialog";
 import { ExcelImportDialog } from "./ExcelImportDialog";
-import { 
-  generateCatanPairings, 
-  generateSwissPairings, 
-  generateRoundRobinPairings, 
+import {
+  generateCatanPairings,
+  generateSwissPairings,
+  generateRoundRobinPairings,
   generateEliminatoryPairings,
-  calculateTableDistribution
+  generateManualSwissRound
 } from "@/lib/tournamentPairing";
 
 interface ParticipantsTabProps {
@@ -283,26 +283,41 @@ export const ParticipantsTab = ({
         matchCount = await insertCatanMatches(activeParticipants, rounds);
         toast.success(`Generated ${matchCount} matches across ${rounds} round${rounds > 1 ? 's' : ''}`);
       } else if (isManualMode) {
-        const { tableSizes } = calculateTableDistribution(activeParticipants.length, playersPerMatch, 2);
-        const matchesPerRound = tableSizes.length || Math.ceil(activeParticipants.length / playersPerMatch);
+        // Generate random pairings for first round using Swiss algorithm
+        const pairings = generateManualSwissRound(activeParticipants, [], 1);
         const matches: any[] = [];
 
-        // Only generate first round for manual mode
-        for (let i = 0; i < matchesPerRound; i++) {
-          matches.push({
-            tournament_id: tournamentId,
-            round: 1,
-            player1_id: null,
-            player2_id: null,
-            status: "pending",
-          });
+        for (const pair of pairings) {
+          if (pair.length === 1) {
+            // BYE match - player wins automatically
+            matches.push({
+              tournament_id: tournamentId,
+              round: 1,
+              player1_id: pair[0].id,
+              player2_id: null,
+              player1_score: 1,
+              player2_score: 0,
+              winner_id: pair[0].id,
+              status: "completed",
+            });
+          } else {
+            matches.push({
+              tournament_id: tournamentId,
+              round: 1,
+              player1_id: pair[0].id,
+              player2_id: pair[1].id,
+              status: "pending",
+            });
+          }
         }
 
         const { error } = await supabase.from("matches").insert(matches);
         if (error) throw error;
 
         matchCount = matches.length;
-        toast.success(`Generated ${matchCount} blank matches for round 1`);
+        const byeCount = pairings.filter(p => p.length === 1).length;
+        const byeMsg = byeCount > 0 ? ` (${byeCount} bye)` : "";
+        toast.success(`Generated ${matchCount} matches for round 1${byeMsg}`);
       } else if (tournamentType === "round_robin") {
         const allRoundMatches = generateRoundRobinPairings(activeParticipants);
         matchCount = await insertPairMatches(allRoundMatches[0]);

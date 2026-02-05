@@ -244,21 +244,12 @@ export const CarcassonneMatchesTab = ({
   };
 
   const generateNextRound = async () => {
-    const currentMaxRound = rounds.length > 0 ? Math.max(...rounds) : 0;
-    const currentRoundMatchesList = groupedMatches[currentMaxRound] || [];
-    
-    // Check all current round matches are completed
-    const pendingMatches = currentRoundMatchesList.filter((m: any) => m.status !== "completed");
-    if (pendingMatches.length > 0) {
-      toast.error("Complete all matches in the current round first");
-      return;
-    }
+    const nextRound = selectedRound + 1;
 
     setGeneratingRound(true);
     try {
       const standings = calculateStandings();
       const history = buildPairingHistory();
-      const nextRound = currentMaxRound + 1;
       
       // Sort players by wins (desc), then point differential (desc)
       const sortedPlayers = [...participants].sort((a, b) => {
@@ -335,13 +326,6 @@ export const CarcassonneMatchesTab = ({
     }
   };
 
-  const canGenerateNextRound = () => {
-    if (rounds.length === 0) return false;
-    const currentMaxRound = Math.max(...rounds);
-    const currentRoundMatchesList = groupedMatches[currentMaxRound] || [];
-    return currentRoundMatchesList.every((m: any) => m.status === "completed");
-  };
-
   const groupedMatches = matches.reduce((acc, match) => {
     const round = match.round;
     if (!acc[round]) acc[round] = [];
@@ -414,14 +398,14 @@ export const CarcassonneMatchesTab = ({
                 QR Results
               </Button>
             )}
-            {canGenerateNextRound() && (
+            {(!numberOfRounds || selectedRound < numberOfRounds) && (
               <Button
                 onClick={generateNextRound}
-                disabled={generatingRound}
+                disabled={generatingRound || !currentRoundMatches.every((m: any) => m.status === "completed")}
                 className="gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Generate Round {Math.max(...rounds) + 1}
+                Generate Round {selectedRound + 1}
               </Button>
             )}
           </div>
