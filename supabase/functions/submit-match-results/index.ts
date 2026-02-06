@@ -14,10 +14,10 @@ Deno.serve(async (req) => {
     const { token, matchId, results } = await req.json();
 
     if (!token || !matchId || !results) {
-      return new Response(
-        JSON.stringify({ error: "Token, matchId, and results are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Token, matchId, and results are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -33,10 +33,10 @@ Deno.serve(async (req) => {
 
     if (tournamentError || !tournament) {
       console.error("Tournament error:", tournamentError);
-      return new Response(
-        JSON.stringify({ error: "Invalid token" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify match belongs to tournament
@@ -49,37 +49,38 @@ Deno.serve(async (req) => {
 
     if (matchError || !match) {
       console.error("Match error:", matchError);
-      return new Response(
-        JSON.stringify({ error: "Match not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Match not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (match.status === "completed") {
-      return new Response(
-        JSON.stringify({ error: "Match already completed" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Match already completed" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Update match participants with results
     const isCatan = tournament.type === "catan";
-    
+
     for (const result of results) {
       const { participantId, victoryPoints, placement, tournamentPoints, score } = result;
 
       if (isCatan) {
-        const { error: updateError } = await supabase
-          .from("match_participants")
-          .upsert({
+        const { error: updateError } = await supabase.from("match_participants").upsert(
+          {
             match_id: matchId,
             participant_id: participantId,
             victory_points: victoryPoints || 0,
             placement: placement || null,
             tournament_points: tournamentPoints || 0,
-          }, {
+          },
+          {
             onConflict: "match_id,participant_id",
-          });
+          },
+        );
 
         if (updateError) {
           console.error("Update error:", updateError);
@@ -101,10 +102,7 @@ Deno.serve(async (req) => {
           else if (currentMatch.player4_id === participantId) updateData.player4_score = score;
 
           if (Object.keys(updateData).length > 0) {
-            const { error: matchUpdateError } = await supabase
-              .from("matches")
-              .update(updateData)
-              .eq("id", matchId);
+            const { error: matchUpdateError } = await supabase.from("matches").update(updateData).eq("id", matchId);
 
             if (matchUpdateError) {
               console.error("Match update error:", matchUpdateError);
@@ -115,11 +113,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Mark match as completed
-    const { error: statusError } = await supabase
-      .from("matches")
-      .update({ status: "completed" })
-      .eq("id", matchId);
+    // Determine winner for non-Catan games from placement data
+    const winnerId = !isCatan ? results.find((r: any) => r.placement === 1)?.participantId || null : null;
+
+    // Mark match as completed (and set winner_id for non-Catan games)
+    const statusUpdate: Record<string, any> = { status: "completed" };
+    if (winnerId) {
+      statusUpdate.winner_id = winnerId;
+    }
+
+    const { error: statusError } = await supabase.from("matches").update(statusUpdate).eq("id", matchId);
 
     if (statusError) {
       console.error("Status update error:", statusError);
@@ -128,15 +131,15 @@ Deno.serve(async (req) => {
 
     console.log(`Match ${matchId} results submitted successfully`);
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to submit results" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Failed to submit results" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
