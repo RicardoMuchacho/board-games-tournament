@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,8 @@ export const ParticipantsTab = ({
   const [showConfirmGenerate, setShowConfirmGenerate] = useState(false);
   const [pendingNotCheckedIn, setPendingNotCheckedIn] = useState<any[]>([]);
 
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     fetchParticipants();
 
@@ -56,12 +58,16 @@ export const ParticipantsTab = ({
         "postgres_changes",
         { event: "*", schema: "public", table: "participants", filter: `tournament_id=eq.${tournamentId}` },
         () => {
-          fetchParticipants();
+          if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+          fetchDebounceRef.current = setTimeout(() => {
+            fetchParticipants();
+          }, 300);
         }
       )
       .subscribe();
 
     return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [tournamentId]);
