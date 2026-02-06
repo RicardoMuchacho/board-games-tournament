@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,28 +135,47 @@ const MatchResults = () => {
 
     setSubmitting(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-match-results`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token,
-            matchId: selectedTable,
-            results: resultEntries.map(([participantId, data]) => ({
-              participantId,
-              victoryPoints: data.victoryPoints,
-              placement: data.placement,
-              tournamentPoints: data.tournamentPoints,
-              score: data.score,
-            })),
-          }),
-        }
-      );
+      if (tournament?.type === "carcassonne") {
+        // Direct supabase update, same as CarcassonneMatchesTab
+        const winnerId = resultEntries.find(([, r]) => r.placement === 1)?.[0] || null;
+        const player1Score = match.player1_id ? (results[match.player1_id]?.score || 0) : 0;
+        const player2Score = match.player2_id ? (results[match.player2_id]?.score || 0) : 0;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to submit results");
+        const { error: updateError } = await supabase
+          .from("matches")
+          .update({
+            player1_score: player1Score,
+            player2_score: player2Score,
+            winner_id: winnerId,
+            status: "completed",
+          })
+          .eq("id", selectedTable);
+
+        if (updateError) throw new Error("Failed to submit results");
+      } else {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-match-results`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token,
+              matchId: selectedTable,
+              results: resultEntries.map(([participantId, data]) => ({
+                participantId,
+                victoryPoints: data.victoryPoints,
+                placement: data.placement,
+                tournamentPoints: data.tournamentPoints,
+                score: data.score,
+              })),
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to submit results");
+        }
       }
 
       toast.success("Results submitted successfully!");
